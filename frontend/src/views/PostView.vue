@@ -1,63 +1,95 @@
 <template>
-  <div class="max-w-2xl mx-auto px-4 py-8">
-    <button @click="$router.back()" class="text-sm text-gray-400 hover:text-gray-600 mb-4">← 返回</button>
+  <div class="mx-auto max-w-4xl px-4 py-8">
+    <button @click="$router.back()" class="mb-4 text-sm text-slate-500 hover:text-slate-950">返回</button>
 
-    <div v-if="loading" class="text-center text-gray-400 py-20">加载中…</div>
+    <div v-if="loading" class="py-20 text-center text-sm text-slate-500">加载中...</div>
     <template v-else-if="post">
-      <!-- 帖子 -->
-      <div class="bg-white rounded-lg shadow-sm border border-gray-100 p-6 mb-6">
-        <div class="flex items-center gap-2 text-xs text-gray-400 mb-3">
-          <span class="font-medium text-gray-600">{{ post.author.display_name }}</span>
-          <span v-if="post.department_tag" class="bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full">{{ post.department_tag }}</span>
-          <span class="ml-auto">{{ formatTime(post.created_at) }}</span>
+      <article class="panel mb-6 bg-white p-5">
+        <div class="mb-4 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
+          <span :class="post.is_pinned ? 'tag-accent' : 'tag'">{{ post.is_pinned ? '置顶' : post.category }}</span>
+          <span v-if="post.is_pinned" class="tag">{{ post.category }}</span>
+          <span v-if="post.department_tag" class="tag">{{ post.department_tag }}</span>
+          <span class="meta ml-auto">{{ formatTime(post.created_at) }}</span>
         </div>
-        <h1 class="text-xl font-bold text-gray-800 mb-3">{{ post.title }}</h1>
-        <p class="text-gray-700 whitespace-pre-wrap">{{ post.content }}</p>
+        <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h1 class="text-2xl font-semibold leading-tight text-slate-950">{{ post.title }}</h1>
+            <p class="meta mt-2">{{ post.author.display_name }}</p>
+          </div>
+          <div v-if="post.can_edit || post.can_delete" class="flex shrink-0 gap-2">
+            <button v-if="post.can_edit" @click="openEdit" class="btn-secondary">编辑</button>
+            <button v-if="post.can_delete" @click="deletePost" class="btn-danger">删除</button>
+          </div>
+        </div>
+        <p class="whitespace-pre-wrap text-sm leading-7 text-slate-700">{{ post.content }}</p>
+      </article>
+
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-base font-semibold text-slate-800">{{ post.comment_count }} 条回复</h2>
       </div>
 
-      <!-- 评论区 -->
-      <h2 class="font-semibold text-gray-700 mb-3">{{ comments.length }} 条回复</h2>
-
-      <!-- 发评论 -->
-      <div v-if="auth.isLoggedIn" class="bg-white rounded-lg border border-gray-200 p-4 mb-4">
-        <textarea v-model="commentText" class="input h-20 resize-none mb-2" :placeholder="replyTo ? `回复 #${replyTo}` : '写下你的回复…'"></textarea>
-        <div class="flex items-center gap-3">
-          <label class="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
-            <input type="checkbox" v-model="commentAnon" class="rounded" /> 匿名
+      <div v-if="auth.isLoggedIn" class="panel mb-4 bg-white p-4">
+        <textarea
+          v-model="commentText"
+          class="input mb-2 h-24 resize-none"
+          :placeholder="replyTo ? `回复 #${replyTo}` : '写下你的回复'"
+        ></textarea>
+        <div class="flex flex-wrap items-center gap-3">
+          <label class="flex cursor-pointer items-center gap-1.5 text-sm text-slate-600">
+            <input type="checkbox" v-model="commentAnon" class="rounded border-slate-300" /> 匿名
           </label>
-          <span v-if="replyTo" class="text-xs text-gray-400">回复 #{{ replyTo }} <button @click="replyTo = null" class="ml-1 text-red-400">×</button></span>
-          <button @click="submitComment" :disabled="!commentText.trim() || submitting" class="btn-primary text-sm ml-auto">
-            {{ submitting ? '提交中…' : '回复' }}
+          <span v-if="replyTo" class="text-xs text-slate-500">
+            回复 #{{ replyTo }}
+            <button @click="replyTo = null" class="ml-1 text-red-600 hover:underline">取消</button>
+          </span>
+          <button @click="submitComment" :disabled="!commentText.trim() || submitting" class="btn-primary ml-auto">
+            {{ submitting ? '提交中...' : '回复' }}
           </button>
         </div>
-        <p v-if="commentError" class="text-red-500 text-xs mt-1">{{ commentError }}</p>
+        <p v-if="commentError" class="mt-2 text-xs text-red-600">{{ commentError }}</p>
       </div>
-      <p v-else class="text-sm text-gray-400 mb-4">
-        <router-link to="/login" class="text-indigo-500 hover:underline">登录</router-link> 后参与讨论
+      <p v-else class="mb-4 text-sm text-slate-500">
+        <router-link to="/login" class="link">登录</router-link> 后参与讨论
       </p>
 
-      <!-- 评论列表 -->
       <div class="space-y-3">
-        <div
+        <section
           v-for="c in rootComments"
           :key="c.id"
-          class="bg-white rounded-lg border border-gray-100 p-4"
+          class="panel bg-white p-4"
+          :class="c.is_deleted ? 'bg-slate-50' : ''"
         >
-          <div class="flex items-center gap-2 text-xs text-gray-400 mb-1">
-            <span class="font-medium text-gray-600">{{ c.author.display_name }}</span>
-            <span class="ml-auto">{{ formatTime(c.created_at) }}</span>
-            <button v-if="auth.isLoggedIn" @click="replyTo = c.id" class="text-indigo-400 hover:underline"># {{ c.id }} 引用</button>
-          </div>
-          <p class="text-gray-700 text-sm whitespace-pre-wrap">{{ c.content }}</p>
+          <CommentBlock :comment="c" @reply="replyTo = $event" @remove="deleteComment" />
 
-          <!-- 二级回复 -->
-          <div v-for="r in repliesOf(c.id)" :key="r.id" class="ml-4 mt-2 border-l-2 border-gray-100 pl-3">
-            <div class="flex items-center gap-2 text-xs text-gray-400 mb-0.5">
-              <span class="font-medium text-gray-600">{{ r.author.display_name }}</span>
-              <span class="ml-auto">{{ formatTime(r.created_at) }}</span>
-            </div>
-            <p class="text-gray-700 text-sm whitespace-pre-wrap">{{ r.content }}</p>
+          <div v-for="r in repliesOf(c.id)" :key="r.id" class="ml-4 mt-3 border-l border-slate-200 pl-3">
+            <CommentBlock :comment="r" @reply="replyTo = $event" @remove="deleteComment" />
           </div>
+        </section>
+      </div>
+
+      <div v-if="showEdit" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+        <div class="panel w-full max-w-lg bg-white p-5">
+          <div class="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
+            <h2 class="text-base font-semibold text-slate-950">编辑帖子</h2>
+            <button @click="showEdit = false" class="text-sm text-slate-500 hover:text-slate-950">关闭</button>
+          </div>
+          <form @submit.prevent="savePost" class="space-y-3">
+            <input v-model.trim="editPost.title" required class="input" placeholder="标题" />
+            <select v-model="editPost.category" class="select">
+              <option v-for="category in writableCategories" :key="category" :value="category">{{ category }}</option>
+            </select>
+            <textarea v-model.trim="editPost.content" required class="input h-36 resize-none" placeholder="内容"></textarea>
+            <input v-model.trim="editPost.department_tag" class="input" placeholder="专攻标签（可选）" />
+            <label v-if="auth.isAdmin" class="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
+              <input type="checkbox" v-model="editPost.is_pinned" class="rounded border-slate-300" />
+              置顶公告
+            </label>
+            <p v-if="postError" class="text-sm text-red-600">{{ postError }}</p>
+            <div class="flex justify-end gap-3 pt-2">
+              <button type="button" @click="showEdit = false" class="btn-secondary">取消</button>
+              <button type="submit" :disabled="savingPost" class="btn-primary">{{ savingPost ? '保存中...' : '保存' }}</button>
+            </div>
+          </form>
         </div>
       </div>
     </template>
@@ -65,14 +97,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, defineComponent, h, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const postId = route.params.id as string
+const categories = ['课程', '研究室', '生活', '租房', '就职', '闲聊']
+const writableCategories = computed(() => auth.isAdmin ? ['公告', ...categories] : categories)
 
 const post = ref<any>(null)
 const comments = ref<any[]>([])
@@ -82,22 +117,93 @@ const commentAnon = ref(false)
 const replyTo = ref<number | null>(null)
 const submitting = ref(false)
 const commentError = ref('')
+const showEdit = ref(false)
+const savingPost = ref(false)
+const postError = ref('')
+const editPost = ref({ title: '', content: '', department_tag: '', category: '闲聊', is_pinned: false })
 
 const rootComments = computed(() => comments.value.filter((c) => !c.parent_id))
 const repliesOf = (id: number) => comments.value.filter((c) => c.parent_id === id)
 
+const CommentBlock = defineComponent({
+  props: { comment: { type: Object, required: true } },
+  emits: ['reply', 'remove'],
+  setup(props, { emit }) {
+    return () => h('div', [
+      h('div', { class: 'mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500' }, [
+        h('span', { class: 'font-medium text-slate-700' }, (props.comment as any).author.display_name),
+        h('span', { class: 'ml-auto' }, formatTime((props.comment as any).created_at)),
+        auth.isLoggedIn && !(props.comment as any).is_deleted
+          ? h('button', { class: 'link text-xs', onClick: () => emit('reply', (props.comment as any).id) }, `# ${(props.comment as any).id} 引用`)
+          : null,
+        (props.comment as any).can_delete
+          ? h('button', { class: 'text-xs text-red-600 hover:underline', onClick: () => emit('remove', (props.comment as any).id) }, '删除')
+          : null
+      ]),
+      h(
+        'p',
+        { class: [(props.comment as any).is_deleted ? 'text-slate-400 italic' : 'text-slate-700', 'whitespace-pre-wrap text-sm leading-6'] },
+        (props.comment as any).content
+      )
+    ])
+  }
+})
+
 async function load() {
   loading.value = true
   try {
-    const [postRes, commentsRes] = await Promise.all([
-      api.get(`/posts/${postId}`),
-      api.get(`/comments/post/${postId}`)
-    ])
-    post.value = postRes.data
-    comments.value = commentsRes.data
+    await refreshPostAndComments()
   } finally {
     loading.value = false
   }
+}
+
+async function refreshPostAndComments() {
+  const [postRes, commentsRes] = await Promise.all([
+    api.get(`/posts/${postId}`),
+    api.get(`/comments/post/${postId}`)
+  ])
+  post.value = postRes.data
+  comments.value = commentsRes.data
+}
+
+function openEdit() {
+  editPost.value = {
+    title: post.value.title,
+    content: post.value.content,
+    department_tag: post.value.department_tag || '',
+    category: post.value.category,
+    is_pinned: post.value.is_pinned
+  }
+  postError.value = ''
+  showEdit.value = true
+}
+
+async function savePost() {
+  savingPost.value = true
+  postError.value = ''
+  try {
+    const payload: Record<string, any> = {
+      title: editPost.value.title,
+      content: editPost.value.content,
+      category: editPost.value.category,
+      department_tag: editPost.value.department_tag || null
+    }
+    if (auth.isAdmin) payload.is_pinned = editPost.value.is_pinned
+    const { data } = await api.patch(`/posts/${postId}`, payload)
+    post.value = data
+    showEdit.value = false
+  } catch (e: any) {
+    postError.value = e.response?.data?.detail || '保存失败'
+  } finally {
+    savingPost.value = false
+  }
+}
+
+async function deletePost() {
+  if (!window.confirm('确认删除这篇帖子？')) return
+  await api.delete(`/posts/${postId}`)
+  router.push('/')
 }
 
 async function submitComment() {
@@ -111,13 +217,18 @@ async function submitComment() {
     })
     commentText.value = ''
     replyTo.value = null
-    const { data } = await api.get(`/comments/post/${postId}`)
-    comments.value = data
+    await refreshPostAndComments()
   } catch (e: any) {
     commentError.value = e.response?.data?.detail || '提交失败'
   } finally {
     submitting.value = false
   }
+}
+
+async function deleteComment(id: number) {
+  if (!window.confirm('确认删除这条评论？')) return
+  await api.delete(`/comments/${id}`)
+  await refreshPostAndComments()
 }
 
 function formatTime(iso: string) {

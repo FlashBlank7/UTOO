@@ -1,5 +1,6 @@
 import secrets
 import string
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -7,8 +8,9 @@ from app.db.session import get_db
 from app.models.user import User
 from app.models.activation_code import ActivationCode, ActivationCodeUsage
 from app.models.post import Post
-from app.schemas.admin import CodeOut, CodeUsageOut, GenerateCodeRequest, PatchCodeRequest
+from app.schemas.admin import CodeOut, CodeUsageOut, GenerateCodeRequest, PatchCodeRequest, ResetPasswordRequest
 from app.schemas.user import UserOut
+from app.core.security import hash_password
 from app.dependencies import get_current_admin
 
 router = APIRouter()
@@ -109,5 +111,27 @@ async def admin_delete_post(
     post = result.scalar_one_or_none()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    await db.delete(post)
+    post.is_deleted = True
+    post.deleted_at = datetime.now(timezone.utc)
     await db.commit()
+
+
+@router.patch("/users/{user_id}/password", response_model=UserOut)
+async def reset_user_password(
+    user_id: int,
+    body: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.hashed_password = hash_password(body.new_password)
+    await db.commit()
+    await db.refresh(user)
+    return user

@@ -30,3 +30,7 @@ class GenerateCodeRequest(BaseModel):
 class PatchCodeRequest(BaseModel):
     is_active: bool | None = None
     max_uses: int | None = None
+
+
+class ResetPasswordRequest(BaseModel):
+    new_password: str

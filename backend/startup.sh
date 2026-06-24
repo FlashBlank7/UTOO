@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+mkdir -p /home/data
+
 echo "Running database migrations..."
 alembic upgrade head
 

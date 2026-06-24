@@ -1,8 +1,10 @@
+import os
+
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql+asyncpg://utoo:utoo_secret@localhost:5432/utoo_db"
+    DATABASE_URL: str | None = None
     SECRET_KEY: str = "dev-secret-key-change-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -18,6 +20,14 @@ class Settings(BaseSettings):
     @property
     def allowed_origins(self) -> list[str]:
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
+
+    @property
+    def database_url(self) -> str:
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
+        if os.getenv("WEBSITE_SITE_NAME"):
+            return "sqlite+aiosqlite:////home/data/utoo.db"
+        return "sqlite+aiosqlite:///./utoo.db"
 
     class Config:
         env_file = ".env"

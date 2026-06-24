@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 .venv/
 backend/app/static/
+utoo.db
 
 node_modules/
 dist/

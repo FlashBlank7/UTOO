@@ -11,6 +11,7 @@ env:
   AZURE_RESOURCE_GROUP: utoo-dev_group
   AZURE_WEBAPP_PACKAGE_PATH: backend
   ALLOWED_ORIGINS: https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net
+  DATABASE_URL: sqlite+aiosqlite:////home/data/utoo.db
   NODE_VERSION: "20"
   PYTHON_VERSION: "3.12"
 
@@ -72,7 +73,8 @@ jobs:
             --name "${{ env.AZURE_WEBAPP_NAME }}" \
             --settings \
               SCM_DO_BUILD_DURING_DEPLOYMENT=true \
-              ALLOWED_ORIGINS="${{ env.ALLOWED_ORIGINS }}"
+              ALLOWED_ORIGINS="${{ env.ALLOWED_ORIGINS }}" \
+              DATABASE_URL="${{ env.DATABASE_URL }}"
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3

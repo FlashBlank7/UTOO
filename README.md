@@ -125,12 +125,13 @@ http://localhost:8010
 
 如果本机 `5432` 已被其他 PostgreSQL 占用，可以把 `docker-compose.yml` 里的数据库端口左侧改成其他端口，例如 `15432:5432`，并在本地开发后端时同步调整 `DATABASE_URL`。
 
-## Azure App Service 部署
+## Azure App Service 免费版部署
 
 本项目支持部署到单个 Azure App Service Python 应用：
 
 - FastAPI 提供 `/api/v1/*` 接口
 - FastAPI 同时托管 Vue 构建后的静态文件
+- 免费版默认使用 SQLite，数据库文件保存在 Azure App Service 的 `/home/data/utoo.db`
 - 用户只需要访问一个域名：`https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net`
 
 GitHub Actions 工作流位于：
@@ -144,7 +145,8 @@ GitHub Actions 工作流位于：
 1. 构建 `frontend`
 2. 把 `frontend/dist` 复制到 `backend/app/static`
 3. 校验后端依赖和 Python 编译
-4. 将 `backend` 部署到 Azure App Service
+4. 配置 Azure App Service 启动命令和 SQLite `DATABASE_URL`
+5. 将 `backend` 部署到 Azure App Service
 
 GitHub 仓库需要配置 Azure Deployment Center 自动生成的 OIDC secrets：
 
@@ -160,15 +162,24 @@ Azure App Service 需要设置 Startup Command：
 bash startup.sh
 ```
 
-Azure App Service 需要设置以下应用配置：
+工作流会自动设置以下应用配置：
+
+```text
+DATABASE_URL=sqlite+aiosqlite:////home/data/utoo.db
+SCM_DO_BUILD_DURING_DEPLOYMENT=true
+ALLOWED_ORIGINS=https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net
+```
+
+建议在 Azure App Service 的环境变量中手动设置一个生产用密钥：
+
+```text
+SECRET_KEY=<生产随机长字符串>
+```
+
+如果以后迁移到 PostgreSQL，只需要把 Azure App Service 中的 `DATABASE_URL` 改回 PostgreSQL asyncpg 连接串，例如：
 
 ```text
 DATABASE_URL=postgresql+asyncpg://<user>:<password>@<host>:5432/<database>?ssl=require
-SECRET_KEY=<生产随机长字符串>
-ACCESS_TOKEN_EXPIRE_MINUTES=15
-REFRESH_TOKEN_EXPIRE_DAYS=7
-SCM_DO_BUILD_DURING_DEPLOYMENT=true
-ALLOWED_ORIGINS=https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net
 ```
 
 部署后验证：

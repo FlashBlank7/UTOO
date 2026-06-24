@@ -34,3 +34,31 @@ class PatchCodeRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     new_password: str
+
+
+class AgentOut(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+    api_key_prefix: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    last_posted_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class CreateAgentRequest(BaseModel):
+    name: str
+    description: str | None = None
+
+
+class PatchAgentRequest(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    is_active: bool | None = None
+
+
+class AgentWithKeyOut(AgentOut):
+    api_key: str

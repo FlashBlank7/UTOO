@@ -5,6 +5,9 @@ from sqlalchemy import select
 from jose import JWTError
 from app.db.session import get_db
 from app.core.security import decode_token
+from app.core.security import verify_password
+from app.core.agent_keys import agent_key_prefix
+from app.models.agent import Agent
 from app.models.user import User
 
 bearer = HTTPBearer()
@@ -34,6 +37,26 @@ async def get_current_admin(user: User = Depends(get_current_user)) -> User:
     if not user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
     return user
+
+
+async def get_current_agent(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer),
+    db: AsyncSession = Depends(get_db),
+) -> Agent:
+    raw_key = credentials.credentials
+    if not raw_key.startswith("utoo_agent_"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid agent API key")
+
+    result = await db.execute(
+        select(Agent).where(
+            Agent.api_key_prefix == agent_key_prefix(raw_key),
+            Agent.is_active == True,  # noqa: E712
+        )
+    )
+    agent = result.scalar_one_or_none()
+    if not agent or not verify_password(raw_key, agent.api_key_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid agent API key")
+    return agent
 
 
 async def get_optional_current_user(

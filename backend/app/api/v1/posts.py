@@ -6,6 +6,7 @@ from app.db.session import get_db
 from app.models.post import Post
 from app.models.user import User
 from app.models.comment import Comment
+from app.models.agent import Agent
 from app.schemas.post import PostCreate, PostOut, PostUpdate, AuthorInfo
 from app.dependencies import get_current_user, get_optional_current_user
 
@@ -26,16 +27,38 @@ def _normalize_category(category: str | None, is_admin: bool = False) -> str:
 
 def _author_info(user: User, is_anonymous: bool) -> AuthorInfo:
     if is_anonymous:
-        return AuthorInfo(display_name=ANON_DISPLAY)
-    return AuthorInfo(display_name=user.display_name or f"用户{user.id}", department=user.department)
+        return AuthorInfo(display_name=ANON_DISPLAY, source="user")
+    return AuthorInfo(
+        display_name=user.display_name or f"用户{user.id}",
+        department=user.department,
+        source="user",
+        id=user.id,
+    )
+
+
+def _agent_author_info(agent: Agent) -> AuthorInfo:
+    return AuthorInfo(display_name=agent.name, source="agent", id=agent.id)
 
 
 def _can_manage(post: Post, user: User | None) -> bool:
     return bool(user and (user.is_admin or post.author_id == user.id))
 
 
-def _post_to_out(post: Post, author: User, comment_count: int, viewer: User | None = None) -> PostOut:
+def _post_to_out(
+    post: Post,
+    author: User | None,
+    comment_count: int,
+    viewer: User | None = None,
+    agent: Agent | None = None,
+) -> PostOut:
     can_manage = _can_manage(post, viewer)
+    if agent:
+        author_info = _agent_author_info(agent)
+    elif author:
+        author_info = _author_info(author, post.is_anonymous)
+    else:
+        author_info = AuthorInfo(display_name="未知作者", source="user")
+
     return PostOut(
         id=post.id,
         title=post.title,
@@ -46,7 +69,7 @@ def _post_to_out(post: Post, author: User, comment_count: int, viewer: User | No
         is_pinned=post.is_pinned,
         created_at=post.created_at,
         updated_at=post.updated_at,
-        author=_author_info(author, post.is_anonymous),
+        author=author_info,
         comment_count=comment_count,
         can_edit=can_manage,
         can_delete=can_manage,
@@ -80,9 +103,17 @@ async def list_posts(
     if not posts:
         return []
 
-    author_ids = [p.author_id for p in posts]
-    users_result = await db.execute(select(User).where(User.id.in_(author_ids)))
-    users = {u.id: u for u in users_result.scalars().all()}
+    author_ids = [p.author_id for p in posts if p.author_id is not None]
+    users = {}
+    if author_ids:
+        users_result = await db.execute(select(User).where(User.id.in_(author_ids)))
+        users = {u.id: u for u in users_result.scalars().all()}
+
+    agent_ids = [p.agent_id for p in posts if p.agent_id is not None]
+    agents = {}
+    if agent_ids:
+        agents_result = await db.execute(select(Agent).where(Agent.id.in_(agent_ids)))
+        agents = {a.id: a for a in agents_result.scalars().all()}
 
     post_ids = [p.id for p in posts]
     counts_result = await db.execute(
@@ -92,7 +123,16 @@ async def list_posts(
     )
     counts = {row[0]: row[1] for row in counts_result.all()}
 
-    return [_post_to_out(p, users[p.author_id], counts.get(p.id, 0), current_user) for p in posts]
+    return [
+        _post_to_out(
+            p,
+            users.get(p.author_id) if p.author_id is not None else None,
+            counts.get(p.id, 0),
+            current_user,
+            agents.get(p.agent_id) if p.agent_id is not None else None,
+        )
+        for p in posts
+    ]
 
 
 @router.post("", response_model=PostOut, status_code=status.HTTP_201_CREATED)
@@ -133,15 +173,21 @@ async def get_post(
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    author_result = await db.execute(select(User).where(User.id == post.author_id))
-    author = author_result.scalar_one()
+    author = None
+    agent = None
+    if post.author_id is not None:
+        author_result = await db.execute(select(User).where(User.id == post.author_id))
+        author = author_result.scalar_one()
+    if post.agent_id is not None:
+        agent_result = await db.execute(select(Agent).where(Agent.id == post.agent_id))
+        agent = agent_result.scalar_one()
 
     count_result = await db.execute(
         select(func.count(Comment.id)).where(Comment.post_id == post_id, Comment.is_deleted == False)  # noqa: E712
     )
     count = count_result.scalar_one()
 
-    return _post_to_out(post, author, count, current_user)
+    return _post_to_out(post, author, count, current_user, agent)
 
 
 @router.patch("/{post_id}", response_model=PostOut)
@@ -182,12 +228,18 @@ async def update_post(
     await db.commit()
     await db.refresh(post)
 
-    author_result = await db.execute(select(User).where(User.id == post.author_id))
-    author = author_result.scalar_one()
+    author = None
+    agent = None
+    if post.author_id is not None:
+        author_result = await db.execute(select(User).where(User.id == post.author_id))
+        author = author_result.scalar_one()
+    if post.agent_id is not None:
+        agent_result = await db.execute(select(Agent).where(Agent.id == post.agent_id))
+        agent = agent_result.scalar_one()
     count_result = await db.execute(
         select(func.count(Comment.id)).where(Comment.post_id == post_id, Comment.is_deleted == False)  # noqa: E712
     )
-    return _post_to_out(post, author, count_result.scalar_one(), current_user)
+    return _post_to_out(post, author, count_result.scalar_one(), current_user, agent)
 
 
 @router.delete("/{post_id}", status_code=status.HTTP_204_NO_CONTENT)

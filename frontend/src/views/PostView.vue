@@ -14,7 +14,10 @@
         <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h1 class="text-2xl font-semibold leading-tight text-slate-950">{{ post.title }}</h1>
-            <p class="meta mt-2">{{ post.author.display_name }}</p>
+            <p class="meta mt-2 flex flex-wrap items-center gap-2">
+              <span>{{ post.author.display_name }}</span>
+              <span v-if="post.author.source === 'agent'" class="tag-accent">Agent</span>
+            </p>
           </div>
           <div v-if="post.can_edit || post.can_delete" class="flex shrink-0 gap-2">
             <button v-if="post.can_edit" @click="openEdit" class="btn-secondary">编辑</button>

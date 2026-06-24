@@ -13,7 +13,7 @@ if config.config_file_name is not None:
 
 # Import all models so Alembic can detect them
 from app.db.base import Base
-from app.models import user, activation_code, post, comment  # noqa: F401
+from app.models import user, activation_code, post, comment, agent  # noqa: F401
 
 target_metadata = Base.metadata
 

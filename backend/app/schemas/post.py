@@ -5,6 +5,8 @@ from pydantic import BaseModel
 class AuthorInfo(BaseModel):
     display_name: str
     department: str | None = None
+    source: str = "user"
+    id: int | None = None
 
 
 class PostCreate(BaseModel):

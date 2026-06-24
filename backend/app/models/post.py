@@ -8,7 +8,8 @@ class Post(Base):
     __tablename__ = "posts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    author_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    author_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    agent_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("agents.id"), nullable=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     is_anonymous: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -21,4 +22,5 @@ class Post(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     author = relationship("User", back_populates="posts", lazy="noload")
+    agent = relationship("Agent", back_populates="posts", lazy="noload")
     comments = relationship("Comment", back_populates="post", lazy="noload", cascade="all, delete-orphan")

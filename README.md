@@ -136,7 +136,7 @@ http://localhost:8010
 GitHub Actions 工作流位于：
 
 ```text
-.github/workflows/azure-webapp.yml
+.github/workflows/main_UTOO-dev.yml
 ```
 
 工作流会在推送到 `main` 时：
@@ -146,10 +146,12 @@ GitHub Actions 工作流位于：
 3. 校验后端依赖和 Python 编译
 4. 将 `backend` 部署到 Azure App Service
 
-GitHub 仓库需要配置 secret：
+GitHub 仓库需要配置 Azure Deployment Center 自动生成的 OIDC secrets：
 
 ```text
-AZURE_WEBAPP_PUBLISH_PROFILE
+AZUREAPPSERVICE_CLIENTID_...
+AZUREAPPSERVICE_TENANTID_...
+AZUREAPPSERVICE_SUBSCRIPTIONID_...
 ```
 
 Azure App Service 需要设置 Startup Command：

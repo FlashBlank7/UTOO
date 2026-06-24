@@ -1,4 +1,4 @@
-name: Deploy UTOO to Azure App Service
+name: Build and deploy UTOO to Azure App Service
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: utoo-dev-f9d3b4fteaaqb8e9
+  AZURE_WEBAPP_NAME: UTOO-dev
   AZURE_WEBAPP_PACKAGE_PATH: backend
   NODE_VERSION: "20"
   PYTHON_VERSION: "3.12"
@@ -15,6 +15,9 @@ env:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout
@@ -49,9 +52,16 @@ jobs:
           pip install -r requirements.txt
           python -m compileall app alembic
 
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_00DBB7F84C9B413EAFEC5754E8B48C36 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_3BAC7D48E25A4943833C7DD9614C183F }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_9F5D89B791134383B3B5B644B0994210 }}
+
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          slot-name: Production
           package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}

@@ -7,6 +7,17 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     ALGORITHM: str = "HS256"
+    ALLOWED_ORIGINS: str = (
+        "http://localhost:5174,"
+        "http://127.0.0.1:5174,"
+        "http://localhost:80,"
+        "http://127.0.0.1:80,"
+        "https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net"
+    )
+
+    @property
+    def allowed_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",") if origin.strip()]
 
     class Config:
         env_file = ".env"

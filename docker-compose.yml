@@ -22,8 +22,9 @@ services:
       SECRET_KEY: change-this-in-production-use-a-long-random-string
       ACCESS_TOKEN_EXPIRE_MINUTES: 15
       REFRESH_TOKEN_EXPIRE_DAYS: 7
+      BACKEND_PORT: 8010
     ports:
-      - "8000:8000"
+      - "8010:8010"
     depends_on:
       db:
         condition: service_healthy
@@ -33,7 +34,7 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "5173:80"
+      - "5174:80"
     depends_on:
       - backend
 

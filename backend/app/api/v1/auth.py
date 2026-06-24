@@ -30,8 +30,30 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     is_admin = False
     if body.activation_code == ADMIN_BOOTSTRAP_CODE:
         result = await db.execute(select(User).where(User.is_admin == True))  # noqa: E712
-        if result.scalar_one_or_none():
+        existing_admin = result.scalar_one_or_none()
+        if existing_admin and existing_admin.username:
             raise HTTPException(status_code=400, detail="Admin bootstrap code already used")
+        if existing_admin:
+            exists = await db.execute(select(User).where(User.username == username))
+            if exists.scalar_one_or_none():
+                raise HTTPException(status_code=400, detail="Username already taken")
+            if body.email:
+                email = str(body.email)
+                exists = await db.execute(select(User).where(User.email == email, User.id != existing_admin.id))
+                if exists.scalar_one_or_none():
+                    raise HTTPException(status_code=400, detail="Email already registered")
+
+            existing_admin.username = username
+            existing_admin.display_name = display_name
+            existing_admin.hashed_password = hash_password(body.password)
+            existing_admin.department = department
+            existing_admin.email = str(body.email) if body.email else None
+            await db.commit()
+            await db.refresh(existing_admin)
+            return TokenResponse(
+                access_token=create_access_token(existing_admin.id),
+                refresh_token=create_refresh_token(existing_admin.id),
+            )
         is_admin = True
         activation_code_record = None
     else:

@@ -56,7 +56,10 @@
         <h2 class="mb-1 text-base font-semibold leading-snug text-slate-950">{{ post.title }}</h2>
         <p class="line-clamp-2 text-sm leading-6 text-slate-600">{{ post.content }}</p>
         <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-          <span>{{ post.author.display_name }}</span>
+          <span class="inline-flex items-center gap-2">
+            <span>{{ post.author.display_name }}</span>
+            <span v-if="post.author.source === 'agent'" class="tag-accent">Agent</span>
+          </span>
           <span>{{ post.comment_count }} 条回复</span>
         </div>
       </article>

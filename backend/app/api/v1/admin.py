@@ -8,9 +8,21 @@ from app.db.session import get_db
 from app.models.user import User
 from app.models.activation_code import ActivationCode, ActivationCodeUsage
 from app.models.post import Post
-from app.schemas.admin import CodeOut, CodeUsageOut, GenerateCodeRequest, PatchCodeRequest, ResetPasswordRequest
+from app.models.agent import Agent
+from app.schemas.admin import (
+    AgentOut,
+    AgentWithKeyOut,
+    CodeOut,
+    CodeUsageOut,
+    CreateAgentRequest,
+    GenerateCodeRequest,
+    PatchAgentRequest,
+    PatchCodeRequest,
+    ResetPasswordRequest,
+)
 from app.schemas.user import UserOut
 from app.core.security import hash_password
+from app.core.agent_keys import agent_key_prefix, generate_agent_api_key
 from app.dependencies import get_current_admin
 
 router = APIRouter()
@@ -19,6 +31,20 @@ router = APIRouter()
 def _random_code(length: int = 8) -> str:
     alphabet = string.ascii_uppercase + string.digits
     return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _agent_response_with_key(agent: Agent, api_key: str) -> AgentWithKeyOut:
+    return AgentWithKeyOut(
+        id=agent.id,
+        name=agent.name,
+        description=agent.description,
+        api_key_prefix=agent.api_key_prefix,
+        api_key=api_key,
+        is_active=agent.is_active,
+        created_at=agent.created_at,
+        updated_at=agent.updated_at,
+        last_posted_at=agent.last_posted_at,
+    )
 
 
 @router.get("/codes", response_model=list[CodeOut])
@@ -99,6 +125,92 @@ async def list_users(
 ):
     result = await db.execute(select(User).order_by(User.created_at.desc()))
     return result.scalars().all()
+
+
+@router.get("/agents", response_model=list[AgentOut])
+async def list_agents(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    result = await db.execute(select(Agent).order_by(Agent.created_at.desc()))
+    return result.scalars().all()
+
+
+@router.post("/agents", response_model=AgentWithKeyOut, status_code=status.HTTP_201_CREATED)
+async def create_agent(
+    body: CreateAgentRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Agent name is required")
+
+    exists = await db.execute(select(Agent).where(Agent.name == name))
+    if exists.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Agent name already exists")
+
+    api_key = generate_agent_api_key()
+    agent = Agent(
+        name=name,
+        description=body.description.strip() if body.description else None,
+        api_key_prefix=agent_key_prefix(api_key),
+        api_key_hash=hash_password(api_key),
+        created_by=current_user.id,
+    )
+    db.add(agent)
+    await db.commit()
+    await db.refresh(agent)
+    return _agent_response_with_key(agent, api_key)
+
+
+@router.patch("/agents/{agent_id}", response_model=AgentOut)
+async def patch_agent(
+    agent_id: int,
+    body: PatchAgentRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    result = await db.execute(select(Agent).where(Agent.id == agent_id))
+    agent = result.scalar_one_or_none()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    if body.name is not None:
+        name = body.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Agent name is required")
+        exists = await db.execute(select(Agent).where(Agent.name == name, Agent.id != agent.id))
+        if exists.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Agent name already exists")
+        agent.name = name
+    if "description" in body.model_fields_set:
+        agent.description = body.description.strip() if body.description else None
+    if body.is_active is not None:
+        agent.is_active = body.is_active
+
+    await db.commit()
+    await db.refresh(agent)
+    return agent
+
+
+@router.post("/agents/{agent_id}/reset-key", response_model=AgentWithKeyOut)
+async def reset_agent_key(
+    agent_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    result = await db.execute(select(Agent).where(Agent.id == agent_id))
+    agent = result.scalar_one_or_none()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    api_key = generate_agent_api_key()
+    agent.api_key_prefix = agent_key_prefix(api_key)
+    agent.api_key_hash = hash_password(api_key)
+    await db.commit()
+    await db.refresh(agent)
+    return _agent_response_with_key(agent, api_key)
 
 
 @router.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)

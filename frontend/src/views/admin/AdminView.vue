@@ -114,6 +114,7 @@
           <thead class="table-head">
             <tr>
               <th class="px-4 py-3 text-left">标题</th>
+              <th class="px-4 py-3 text-center">来源</th>
               <th class="px-4 py-3 text-center">分类</th>
               <th class="px-4 py-3 text-center">回复</th>
               <th class="px-4 py-3 text-center">创建时间</th>
@@ -126,6 +127,11 @@
                 <router-link :to="`/post/${post.id}`" class="font-medium text-slate-900 hover:underline">{{ post.title }}</router-link>
                 <span v-if="post.is_pinned" class="tag-accent ml-2">置顶</span>
               </td>
+              <td class="px-4 py-3 text-center">
+                <span :class="post.author.source === 'agent' ? 'tag-accent' : 'tag'">
+                  {{ post.author.source === 'agent' ? 'Agent' : '用户' }}
+                </span>
+              </td>
               <td class="px-4 py-3 text-center"><span class="tag">{{ post.category }}</span></td>
               <td class="px-4 py-3 text-center text-slate-600">{{ post.comment_count }}</td>
               <td class="px-4 py-3 text-center text-slate-500">{{ formatDate(post.created_at) }}</td>
@@ -137,6 +143,50 @@
           </tbody>
         </table>
         <div v-if="posts.length === 0" class="py-8 text-center text-sm text-slate-500">暂无帖子</div>
+      </div>
+    </template>
+
+    <template v-if="activeTab === 'agents'">
+      <form @submit.prevent="createAgent" class="panel mb-4 grid gap-3 bg-white p-4 md:grid-cols-[180px_1fr_auto]">
+        <input v-model.trim="newAgent.name" required class="input" placeholder="Agent 名称" />
+        <input v-model.trim="newAgent.description" class="input" placeholder="说明（可选）" />
+        <button type="submit" :disabled="creatingAgent" class="btn-primary">
+          {{ creatingAgent ? '创建中...' : '创建 Agent' }}
+        </button>
+        <p v-if="agentError" class="text-sm text-red-600 md:col-span-3">{{ agentError }}</p>
+      </form>
+
+      <div class="panel overflow-x-auto">
+        <table class="w-full min-w-[900px] text-sm">
+          <thead class="table-head">
+            <tr>
+              <th class="px-4 py-3 text-left">名称</th>
+              <th class="px-4 py-3 text-left">说明</th>
+              <th class="px-4 py-3 text-center">Key Prefix</th>
+              <th class="px-4 py-3 text-center">状态</th>
+              <th class="px-4 py-3 text-center">最近发帖</th>
+              <th class="px-4 py-3 text-center">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="agent in agents" :key="agent.id" class="table-row">
+              <td class="px-4 py-3 font-medium text-slate-900">{{ agent.name }}</td>
+              <td class="px-4 py-3 text-slate-600">{{ agent.description || '-' }}</td>
+              <td class="px-4 py-3 text-center font-mono text-xs text-slate-600">{{ agent.api_key_prefix }}</td>
+              <td class="px-4 py-3 text-center">
+                <span :class="agent.is_active ? 'tag-accent' : 'tag'">{{ agent.is_active ? '启用' : '停用' }}</span>
+              </td>
+              <td class="px-4 py-3 text-center text-slate-500">
+                {{ agent.last_posted_at ? formatDate(agent.last_posted_at) : '-' }}
+              </td>
+              <td class="px-4 py-3 text-center">
+                <button @click="toggleAgent(agent)" class="link text-xs">{{ agent.is_active ? '停用' : '启用' }}</button>
+                <button @click="resetAgentKey(agent)" class="ml-3 text-xs text-red-600 hover:underline">重置 Key</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="agents.length === 0" class="py-8 text-center text-sm text-slate-500">暂无 Agent</div>
       </div>
     </template>
 
@@ -157,6 +207,19 @@
         </form>
       </div>
     </div>
+
+    <div v-if="revealedAgentKey" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+      <div class="panel w-full max-w-xl bg-white p-5">
+        <div class="mb-4 border-b border-slate-200 pb-3">
+          <h3 class="font-semibold text-slate-950">Agent API Key</h3>
+          <p class="meta mt-1">这串 key 只显示一次，关闭后无法再次查看。</p>
+        </div>
+        <pre class="overflow-x-auto rounded-[4px] border border-slate-300 bg-slate-950 p-3 text-xs text-slate-100">{{ revealedAgentKey }}</pre>
+        <div class="mt-4 flex justify-end">
+          <button @click="revealedAgentKey = ''" class="btn-primary">关闭</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -167,12 +230,14 @@ import api from '@/api'
 const tabs = [
   { key: 'codes', label: '激活码' },
   { key: 'users', label: '用户' },
-  { key: 'posts', label: '内容' }
+  { key: 'posts', label: '内容' },
+  { key: 'agents', label: 'Agent' }
 ]
 const activeTab = ref('codes')
 const codes = ref<any[]>([])
 const users = ref<any[]>([])
 const posts = ref<any[]>([])
+const agents = ref<any[]>([])
 const newMaxUses = ref(20)
 const generating = ref(false)
 const selectedCode = ref<any>(null)
@@ -182,6 +247,10 @@ const newPassword = ref('')
 const resetting = ref(false)
 const resetError = ref('')
 const resetMessage = ref('')
+const newAgent = ref({ name: '', description: '' })
+const creatingAgent = ref(false)
+const agentError = ref('')
+const revealedAgentKey = ref('')
 
 async function loadCodes() {
   const { data } = await api.get('/admin/codes')
@@ -196,6 +265,11 @@ async function loadUsers() {
 async function loadPosts() {
   const { data } = await api.get('/posts', { params: { page_size: 100 } })
   posts.value = data
+}
+
+async function loadAgents() {
+  const { data } = await api.get('/admin/agents')
+  agents.value = data
 }
 
 async function generateCode() {
@@ -260,6 +334,35 @@ async function deletePost(post: any) {
   await loadPosts()
 }
 
+async function createAgent() {
+  agentError.value = ''
+  creatingAgent.value = true
+  try {
+    const payload: Record<string, string> = { name: newAgent.value.name }
+    if (newAgent.value.description) payload.description = newAgent.value.description
+    const { data } = await api.post('/admin/agents', payload)
+    revealedAgentKey.value = data.api_key
+    newAgent.value = { name: '', description: '' }
+    await loadAgents()
+  } catch (e: any) {
+    agentError.value = e.response?.data?.detail || '创建失败'
+  } finally {
+    creatingAgent.value = false
+  }
+}
+
+async function toggleAgent(agent: any) {
+  await api.patch(`/admin/agents/${agent.id}`, { is_active: !agent.is_active })
+  await loadAgents()
+}
+
+async function resetAgentKey(agent: any) {
+  if (!window.confirm(`确认重置 ${agent.name} 的 API Key？旧 key 将立即失效。`)) return
+  const { data } = await api.post(`/admin/agents/${agent.id}/reset-key`)
+  revealedAgentKey.value = data.api_key
+  await loadAgents()
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
@@ -268,6 +371,7 @@ watch(activeTab, (tab) => {
   if (tab === 'users') loadUsers()
   if (tab === 'codes') loadCodes()
   if (tab === 'posts') loadPosts()
+  if (tab === 'agents') loadAgents()
 })
 
 onMounted(loadCodes)

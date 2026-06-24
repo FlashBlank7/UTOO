@@ -17,10 +17,12 @@
       </div>
     </nav>
     <router-view />
+    <CatgirlWanderer />
   </div>
 </template>
 
 <script setup lang="ts">
+import CatgirlWanderer from '@/components/CatgirlWanderer.vue'
 import { useAuthStore } from '@/stores/auth'
 const auth = useAuthStore()
 </script>

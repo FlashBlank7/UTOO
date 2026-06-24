@@ -8,7 +8,9 @@ on:
 
 env:
   AZURE_WEBAPP_NAME: UTOO-dev
+  AZURE_RESOURCE_GROUP: utoo-dev_group
   AZURE_WEBAPP_PACKAGE_PATH: backend
+  ALLOWED_ORIGINS: https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net
   NODE_VERSION: "20"
   PYTHON_VERSION: "3.12"
 
@@ -58,6 +60,19 @@ jobs:
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_00DBB7F84C9B413EAFEC5754E8B48C36 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_3BAC7D48E25A4943833C7DD9614C183F }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_9F5D89B791134383B3B5B644B0994210 }}
+
+      - name: Configure Azure App Service
+        run: |
+          az webapp config set \
+            --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ env.AZURE_WEBAPP_NAME }}" \
+            --startup-file "bash startup.sh"
+          az webapp config appsettings set \
+            --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ env.AZURE_WEBAPP_NAME }}" \
+            --settings \
+              SCM_DO_BUILD_DURING_DEPLOYMENT=true \
+              ALLOWED_ORIGINS="${{ env.ALLOWED_ORIGINS }}"
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3

@@ -9,6 +9,7 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     username: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     department: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)

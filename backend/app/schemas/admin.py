@@ -16,6 +16,7 @@ class CodeOut(BaseModel):
 class CodeUsageOut(BaseModel):
     user_id: int
     username: str | None
+    display_name: str | None = None
     department: str
     used_at: datetime
 

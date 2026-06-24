@@ -59,7 +59,7 @@
           <div v-if="usages.length === 0" class="text-gray-400 text-sm text-center py-4">暂无用户</div>
           <ul v-else class="space-y-2 text-sm">
             <li v-for="u in usages" :key="u.user_id" class="flex justify-between text-gray-700">
-              <span>{{ u.username || '匿名' }} · {{ u.department }}</span>
+              <span>{{ u.display_name || u.username || `用户${u.user_id}` }} · {{ u.department }}</span>
               <span class="text-gray-400">{{ formatDate(u.used_at) }}</span>
             </li>
           </ul>
@@ -74,6 +74,7 @@
           <thead class="bg-gray-50 text-gray-500 text-xs">
             <tr>
               <th class="px-4 py-3 text-left">ID</th>
+              <th class="px-4 py-3 text-left">用户名</th>
               <th class="px-4 py-3 text-left">昵称</th>
               <th class="px-4 py-3 text-left">专攻</th>
               <th class="px-4 py-3 text-center">角色</th>
@@ -84,6 +85,7 @@
             <tr v-for="u in users" :key="u.id" class="hover:bg-gray-50">
               <td class="px-4 py-3 text-gray-400">{{ u.id }}</td>
               <td class="px-4 py-3 font-medium text-gray-700">{{ u.username || '—' }}</td>
+              <td class="px-4 py-3 text-gray-600">{{ u.display_name || '—' }}</td>
               <td class="px-4 py-3 text-gray-600">{{ u.department }}</td>
               <td class="px-4 py-3 text-center">
                 <span :class="['px-2 py-0.5 rounded-full text-xs', u.is_admin ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-500']">

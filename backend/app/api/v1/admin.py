@@ -62,6 +62,7 @@ async def code_usages(
         CodeUsageOut(
             user_id=u.user_id,
             username=users[u.user_id].username,
+            display_name=users[u.user_id].display_name,
             department=users[u.user_id].department,
             used_at=u.used_at,
         )

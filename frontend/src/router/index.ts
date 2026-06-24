@@ -9,6 +9,11 @@ const router = createRouter({
     { path: '/login', component: () => import('@/views/LoginView.vue') },
     { path: '/register', component: () => import('@/views/RegisterView.vue') },
     {
+      path: '/account',
+      component: () => import('@/views/AccountView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/admin',
       component: () => import('@/views/admin/AdminView.vue'),
       meta: { requiresAdmin: true }
@@ -19,6 +24,10 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
   if (!auth.user) await auth.fetchMe()
+
+  if (to.meta.requiresAuth && !auth.isLoggedIn) {
+    return { path: '/login' }
+  }
 
   if (to.meta.requiresAdmin && !auth.isAdmin) {
     return { path: '/' }

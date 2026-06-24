@@ -4,11 +4,15 @@
     <form @submit.prevent="submit" class="bg-white rounded-lg shadow p-6 space-y-4">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">激活码 <span class="text-red-500">*</span></label>
-        <input v-model="form.activation_code" required class="input" placeholder="8位激活码" />
+        <input v-model.trim="form.activation_code" required class="input" placeholder="8位激活码" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">用户名 <span class="text-red-500">*</span></label>
+        <input v-model.trim="form.username" required class="input" placeholder="用于登录，不会公开显示" />
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">专攻 / 研究科 <span class="text-red-500">*</span></label>
-        <input v-model="form.department" required class="input" placeholder="例：情報理工学系研究科" />
+        <input v-model.trim="form.department" required class="input" placeholder="例：情報理工学系研究科" />
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">密码 <span class="text-red-500">*</span></label>
@@ -16,7 +20,7 @@
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">昵称（可选）</label>
-        <input v-model="form.username" class="input" placeholder="留空则全程匿名" />
+        <input v-model.trim="form.display_name" class="input" placeholder="公开展示名，留空则显示用户编号" />
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">邮箱（可选）</label>
@@ -45,7 +49,7 @@ import { useAuthStore } from '@/stores/auth'
 const router = useRouter()
 const auth = useAuthStore()
 
-const form = ref({ activation_code: '', department: '', password: '', username: '', email: '' })
+const form = ref({ activation_code: '', department: '', password: '', username: '', display_name: '', email: '' })
 const error = ref('')
 const loading = ref(false)
 
@@ -57,8 +61,9 @@ async function submit() {
       activation_code: form.value.activation_code,
       department: form.value.department,
       password: form.value.password,
+      username: form.value.username,
     }
-    if (form.value.username) payload.username = form.value.username
+    if (form.value.display_name) payload.display_name = form.value.display_name
     if (form.value.email) payload.email = form.value.email
 
     const { data } = await api.post('/auth/register', payload)

@@ -3,8 +3,8 @@
     <h1 class="text-2xl font-bold text-center mb-8">登录 UTOO</h1>
     <form @submit.prevent="submit" class="bg-white rounded-lg shadow p-6 space-y-4">
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">昵称或邮箱</label>
-        <input v-model="identifier" required class="input" placeholder="昵称 或 邮箱" />
+        <label class="block text-sm font-medium text-gray-700 mb-1">用户名或邮箱</label>
+        <input v-model.trim="identifier" required class="input" placeholder="用户名 或 邮箱" />
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">密码</label>

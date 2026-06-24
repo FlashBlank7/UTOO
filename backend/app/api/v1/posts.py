@@ -16,7 +16,7 @@ ANON_DISPLAY = "匿名用户"
 def _author_info(user: User, is_anonymous: bool) -> AuthorInfo:
     if is_anonymous:
         return AuthorInfo(display_name=ANON_DISPLAY)
-    return AuthorInfo(display_name=user.username or f"用户{user.id}", department=user.department)
+    return AuthorInfo(display_name=user.display_name or f"用户{user.id}", department=user.department)
 
 
 def _post_to_out(post: Post, author: User, comment_count: int) -> PostOut:

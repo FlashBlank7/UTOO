@@ -4,7 +4,7 @@
       <router-link to="/" class="text-lg font-bold text-indigo-600">UTOO</router-link>
       <div class="flex items-center gap-4 text-sm">
         <template v-if="auth.isLoggedIn">
-          <span class="text-gray-500">{{ auth.user?.username || '匿名' }}</span>
+          <router-link to="/account" class="text-gray-500 hover:text-indigo-500">{{ auth.displayName }}</router-link>
           <router-link v-if="auth.isAdmin" to="/admin" class="text-indigo-500 hover:underline">管理</router-link>
           <button @click="auth.logout(); $router.push('/')" class="text-gray-400 hover:text-gray-600">退出</button>
         </template>

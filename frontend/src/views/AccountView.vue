@@ -1,49 +1,52 @@
 <template>
-  <div class="max-w-xl mx-auto px-4 py-8">
-    <h1 class="text-xl font-bold text-gray-800 mb-6">我的信息</h1>
+  <div class="mx-auto max-w-xl px-4 py-8">
+    <div class="mb-6 border-b border-slate-200 pb-5">
+      <p class="meta mb-1">Account</p>
+      <h1 class="text-2xl font-semibold text-slate-950">我的信息</h1>
+    </div>
 
-    <form @submit.prevent="saveProfile" class="bg-white rounded-lg border border-gray-100 p-6 space-y-4">
+    <form @submit.prevent="saveProfile" class="panel bg-white p-5 space-y-4">
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
-        <input :value="auth.user?.username || ''" disabled class="input bg-gray-50 text-gray-400" />
+        <label class="mb-1 block text-sm font-medium text-slate-700">用户名</label>
+        <input :value="auth.user?.username || ''" disabled class="input" />
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">昵称</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700">昵称</label>
         <input v-model.trim="profile.display_name" class="input" placeholder="公开展示名，可留空" />
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">专攻 / 研究科</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700">专攻 / 研究科</label>
         <input v-model.trim="profile.department" required class="input" />
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">邮箱</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700">邮箱</label>
         <input v-model.trim="profile.email" type="email" class="input" placeholder="可选" />
       </div>
 
-      <p v-if="profileMessage" class="text-green-600 text-sm">{{ profileMessage }}</p>
-      <p v-if="profileError" class="text-red-500 text-sm">{{ profileError }}</p>
+      <p v-if="profileMessage" class="text-sm text-teal-700">{{ profileMessage }}</p>
+      <p v-if="profileError" class="text-sm text-red-600">{{ profileError }}</p>
 
       <button type="submit" :disabled="savingProfile" class="btn-primary">
-        {{ savingProfile ? '保存中…' : '保存资料' }}
+        {{ savingProfile ? '保存中...' : '保存资料' }}
       </button>
     </form>
 
-    <form @submit.prevent="changePassword" class="bg-white rounded-lg border border-gray-100 p-6 space-y-4 mt-6">
-      <h2 class="font-semibold text-gray-800">修改密码</h2>
+    <form @submit.prevent="changePassword" class="panel mt-6 bg-white p-5 space-y-4">
+      <h2 class="font-semibold text-slate-950">修改密码</h2>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">当前密码</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700">当前密码</label>
         <input v-model="password.current_password" type="password" required class="input" />
       </div>
       <div>
-        <label class="block text-sm font-medium text-gray-700 mb-1">新密码</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700">新密码</label>
         <input v-model="password.new_password" type="password" required minlength="6" class="input" />
       </div>
 
-      <p v-if="passwordMessage" class="text-green-600 text-sm">{{ passwordMessage }}</p>
-      <p v-if="passwordError" class="text-red-500 text-sm">{{ passwordError }}</p>
+      <p v-if="passwordMessage" class="text-sm text-teal-700">{{ passwordMessage }}</p>
+      <p v-if="passwordError" class="text-sm text-red-600">{{ passwordError }}</p>
 
       <button type="submit" :disabled="savingPassword" class="btn-primary">
-        {{ savingPassword ? '更新中…' : '更新密码' }}
+        {{ savingPassword ? '更新中...' : '更新密码' }}
       </button>
     </form>
   </div>

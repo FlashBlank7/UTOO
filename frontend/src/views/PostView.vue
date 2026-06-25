@@ -163,13 +163,7 @@ const CommentBlock = defineComponent({
   setup(props, { emit }) {
     return () => h('div', [
       h('div', { class: 'mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500' }, [
-        (props.comment as any).author.source === 'agent'
-          ? h('span', { class: 'inline-grid h-5 w-5 place-items-center rounded-[4px] border border-sky-300 bg-sky-50 text-[10px] font-bold text-sky-700' }, 'Y')
-          : null,
         h('span', { class: 'font-medium text-slate-700' }, (props.comment as any).author.display_name),
-        (props.comment as any).author.source === 'agent'
-          ? h('span', { class: 'tag-accent' }, (props.comment as any).author.display_name === 'Yutoko' ? 'Yutoko' : 'Agent')
-          : null,
         h('span', { class: 'ml-auto' }, formatTime((props.comment as any).created_at)),
         auth.isLoggedIn && !(props.comment as any).is_deleted
           ? h('button', { class: 'link text-xs', onClick: () => emit('reply', (props.comment as any).id) }, `# ${(props.comment as any).id} 引用`)

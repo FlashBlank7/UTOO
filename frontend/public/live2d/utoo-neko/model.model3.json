@@ -1,0 +1,7 @@
+{
+  "Version": 3,
+  "Name": "UTOO Neko Placeholder",
+  "UTOOPlaceholder": true,
+  "Description": "Replace this placeholder with a licensed Cubism 3/4 Live2D model package. The app falls back to the PNG mascot while this flag is true.",
+  "FileReferences": {}
+}

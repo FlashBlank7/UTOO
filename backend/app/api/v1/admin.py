@@ -1,7 +1,7 @@
 import secrets
 import string
-from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from datetime import datetime, timedelta, timezone
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.session import get_db
@@ -9,11 +9,14 @@ from app.models.user import User
 from app.models.activation_code import ActivationCode, ActivationCodeUsage
 from app.models.post import Post
 from app.models.agent import Agent
+from app.models.comment import Comment
+from app.models.report import ModerationLog, Report
 from app.schemas.admin import (
     AgentOut,
     AgentWithKeyOut,
     CodeOut,
     CodeUsageOut,
+    CreateAnnouncementRequest,
     CreateAgentRequest,
     GenerateCodeRequest,
     PatchAgentRequest,
@@ -21,8 +24,26 @@ from app.schemas.admin import (
     ResetPasswordRequest,
 )
 from app.schemas.user import UserOut
+from app.schemas.post import PostOut, AuthorInfo
+from app.schemas.report import (
+    ModerationLogOut,
+    PatchReportRequest,
+    ReportOut,
+    UserModerationRequest,
+    VisibilityRequest,
+)
 from app.core.security import hash_password
 from app.core.agent_keys import agent_key_prefix, generate_agent_api_key
+from app.core.moderation import (
+    REPORT_PENDING,
+    REPORT_RESOLVED,
+    VISIBILITY_DELETED,
+    VISIBILITY_HIDDEN,
+    VISIBILITY_NORMAL,
+    add_moderation_log,
+    set_comment_visibility,
+    set_post_visibility,
+)
 from app.dependencies import get_current_admin
 
 router = APIRouter()
@@ -45,6 +66,28 @@ def _agent_response_with_key(agent: Agent, api_key: str) -> AgentWithKeyOut:
         updated_at=agent.updated_at,
         last_posted_at=agent.last_posted_at,
     )
+
+
+def _validate_visibility(visibility: str) -> str:
+    if visibility not in {VISIBILITY_NORMAL, VISIBILITY_HIDDEN, VISIBILITY_DELETED}:
+        raise HTTPException(status_code=400, detail="Invalid visibility")
+    return visibility
+
+
+async def _target_author(db: AsyncSession, target_type: str, target_id: int) -> User | None:
+    if target_type == "post":
+        result = await db.execute(select(Post).where(Post.id == target_id))
+        post = result.scalar_one_or_none()
+        if post and post.author_id:
+            user_result = await db.execute(select(User).where(User.id == post.author_id))
+            return user_result.scalar_one_or_none()
+    if target_type == "comment":
+        result = await db.execute(select(Comment).where(Comment.id == target_id))
+        comment = result.scalar_one_or_none()
+        if comment:
+            user_result = await db.execute(select(User).where(User.id == comment.author_id))
+            return user_result.scalar_one_or_none()
+    return None
 
 
 @router.get("/codes", response_model=list[CodeOut])
@@ -125,6 +168,42 @@ async def list_users(
 ):
     result = await db.execute(select(User).order_by(User.created_at.desc()))
     return result.scalars().all()
+
+
+@router.patch("/users/{user_id}/moderation", response_model=UserOut)
+async def moderate_user(
+    user_id: int,
+    body: UserModerationRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if body.is_banned is not None:
+        user.is_banned = body.is_banned
+        add_moderation_log(
+            db,
+            current_user,
+            "user",
+            user.id,
+            "ban" if body.is_banned else "unban",
+            body.reason,
+        )
+    if body.clear_mute:
+        user.muted_until = None
+        add_moderation_log(db, current_user, "user", user.id, "unmute", body.reason)
+    elif body.mute_days is not None:
+        if body.mute_days <= 0:
+            raise HTTPException(status_code=400, detail="mute_days must be positive")
+        user.muted_until = datetime.now(timezone.utc) + timedelta(days=body.mute_days)
+        add_moderation_log(db, current_user, "user", user.id, "mute", body.reason)
+
+    await db.commit()
+    await db.refresh(user)
+    return user
 
 
 @router.get("/agents", response_model=list[AgentOut])
@@ -223,9 +302,167 @@ async def admin_delete_post(
     post = result.scalar_one_or_none()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
-    post.is_deleted = True
-    post.deleted_at = datetime.now(timezone.utc)
+    set_post_visibility(post, VISIBILITY_DELETED)
+    add_moderation_log(db, _, "post", post.id, "delete", "admin delete")
     await db.commit()
+
+
+@router.patch("/posts/{post_id}/visibility", status_code=status.HTTP_204_NO_CONTENT)
+async def set_admin_post_visibility(
+    post_id: int,
+    body: VisibilityRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    result = await db.execute(select(Post).where(Post.id == post_id))
+    post = result.scalar_one_or_none()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    visibility = _validate_visibility(body.visibility)
+    set_post_visibility(post, visibility)
+    add_moderation_log(db, current_user, "post", post.id, f"set_{visibility}", body.reason)
+    await db.commit()
+
+
+@router.patch("/comments/{comment_id}/visibility", status_code=status.HTTP_204_NO_CONTENT)
+async def set_admin_comment_visibility(
+    comment_id: int,
+    body: VisibilityRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    result = await db.execute(select(Comment).where(Comment.id == comment_id))
+    comment = result.scalar_one_or_none()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    visibility = _validate_visibility(body.visibility)
+    set_comment_visibility(comment, visibility)
+    add_moderation_log(db, current_user, "comment", comment.id, f"set_{visibility}", body.reason)
+    await db.commit()
+
+
+@router.get("/reports", response_model=list[ReportOut])
+async def list_reports(
+    status_filter: str | None = Query(None, alias="status"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    stmt = select(Report).order_by(Report.created_at.desc())
+    if status_filter:
+        stmt = stmt.where(Report.status == status_filter)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
+@router.patch("/reports/{report_id}", response_model=ReportOut)
+async def patch_report(
+    report_id: int,
+    body: PatchReportRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    result = await db.execute(select(Report).where(Report.id == report_id))
+    report = result.scalar_one_or_none()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    action = body.action
+    if action in {"hide", "delete"}:
+        visibility = VISIBILITY_HIDDEN if action == "hide" else VISIBILITY_DELETED
+        if report.target_type == "post":
+            target_result = await db.execute(select(Post).where(Post.id == report.target_id))
+            target = target_result.scalar_one_or_none()
+            if target:
+                set_post_visibility(target, visibility)
+        elif report.target_type == "comment":
+            target_result = await db.execute(select(Comment).where(Comment.id == report.target_id))
+            target = target_result.scalar_one_or_none()
+            if target:
+                set_comment_visibility(target, visibility)
+        add_moderation_log(db, current_user, report.target_type, report.target_id, action, body.resolution)
+    elif action == "mute":
+        author = await _target_author(db, report.target_type, report.target_id)
+        if not author:
+            raise HTTPException(status_code=400, detail="Target has no user author to mute")
+        days = body.mute_days or 1
+        if days <= 0:
+            raise HTTPException(status_code=400, detail="mute_days must be positive")
+        author.muted_until = datetime.now(timezone.utc) + timedelta(days=days)
+        add_moderation_log(db, current_user, "user", author.id, "mute", body.resolution)
+    elif action != "resolve":
+        raise HTTPException(status_code=400, detail="Invalid report action")
+
+    report.status = REPORT_RESOLVED
+    report.resolved_by = current_user.id
+    report.resolution = body.resolution or action
+    add_moderation_log(db, current_user, "report", report.id, f"resolve_{action}", body.resolution)
+    await db.commit()
+    await db.refresh(report)
+    return report
+
+
+@router.get("/moderation-logs", response_model=list[ModerationLogOut])
+async def list_moderation_logs(
+    target_type: str | None = Query(None),
+    action: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    stmt = select(ModerationLog).order_by(ModerationLog.created_at.desc()).limit(200)
+    if target_type:
+        stmt = stmt.where(ModerationLog.target_type == target_type)
+    if action:
+        stmt = stmt.where(ModerationLog.action == action)
+    result = await db.execute(stmt)
+    return result.scalars().all()
+
+
+@router.post("/announcements", response_model=PostOut, status_code=status.HTTP_201_CREATED)
+async def create_announcement(
+    body: CreateAnnouncementRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    title = body.title.strip()
+    content = body.content.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Title is required")
+    if not content:
+        raise HTTPException(status_code=400, detail="Content is required")
+    post = Post(
+        author_id=current_user.id,
+        title=title,
+        content=content,
+        category="公告",
+        is_pinned=True,
+        visibility=VISIBILITY_NORMAL,
+    )
+    db.add(post)
+    await db.flush()
+    add_moderation_log(db, current_user, "post", post.id, "create_announcement", None)
+    await db.commit()
+    await db.refresh(post)
+    return PostOut(
+        id=post.id,
+        title=post.title,
+        content=post.content,
+        is_anonymous=False,
+        department_tag=None,
+        category=post.category,
+        visibility=post.visibility,
+        is_pinned=post.is_pinned,
+        created_at=post.created_at,
+        updated_at=post.updated_at,
+        author=AuthorInfo(
+            display_name=current_user.display_name or f"用户{current_user.id}",
+            department=current_user.department,
+            source="user",
+            id=current_user.id,
+        ),
+        comment_count=0,
+        can_edit=True,
+        can_delete=True,
+    )
 
 
 @router.patch("/users/{user_id}/password", response_model=UserOut)

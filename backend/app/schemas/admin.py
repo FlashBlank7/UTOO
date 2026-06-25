@@ -36,6 +36,11 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
+class CreateAnnouncementRequest(BaseModel):
+    title: str
+    content: str
+
+
 class AgentOut(BaseModel):
     id: int
     name: str

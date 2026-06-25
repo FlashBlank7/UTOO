@@ -32,6 +32,7 @@ class PostOut(BaseModel):
     is_anonymous: bool
     department_tag: str | None
     category: str
+    visibility: str = "normal"
     is_pinned: bool
     created_at: datetime
     updated_at: datetime
@@ -54,6 +55,7 @@ class CommentOut(BaseModel):
     content: str
     is_anonymous: bool
     parent_id: int | None
+    visibility: str = "normal"
     is_deleted: bool = False
     deleted_at: datetime | None = None
     created_at: datetime

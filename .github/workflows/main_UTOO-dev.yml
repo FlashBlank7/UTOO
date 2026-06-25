@@ -93,9 +93,12 @@ jobs:
               ACCESS_TOKEN_EXPIRE_MINUTES="${{ env.ACCESS_TOKEN_EXPIRE_MINUTES }}" \
               REFRESH_TOKEN_EXPIRE_DAYS="${{ env.REFRESH_TOKEN_EXPIRE_DAYS }}"
 
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          slot-name: Production
-          package: backend-deploy.zip
+      - name: Deploy zip to Azure Web App
+        run: |
+          az webapp deploy \
+            --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ env.AZURE_WEBAPP_NAME }}" \
+            --src-path backend-deploy.zip \
+            --type zip \
+            --clean true \
+            --restart true

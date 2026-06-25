@@ -91,7 +91,7 @@ async def maybe_create_yutoko_comment(db: AsyncSession, post: Post) -> Comment |
     comment = Comment(
         post_id=post.id,
         agent_id=agent.id,
-        author_id=None,
+        author_id=agent.created_by,
         content=random.choice(lines),
         is_anonymous=False,
     )

@@ -16,13 +16,13 @@ export type MascotOutfit = {
 }
 
 export const mascotOutfits: MascotOutfit[] = [
-  { id: 'sunday', weekday: 0, label: '周日', image: sunday, theme: 'Yutoko 银杏和风' },
-  { id: 'monday', weekday: 1, label: '周一', image: monday, theme: 'Yutoko 研究室蓝牌' },
-  { id: 'tuesday', weekday: 2, label: '周二', image: tuesday, theme: 'Yutoko 蓝黄校园针织' },
-  { id: 'wednesday', weekday: 3, label: '周三', image: wednesday, theme: 'Yutoko 银杏通勤' },
-  { id: 'thursday', weekday: 4, label: '周四', image: thursday, theme: 'Yutoko 技术研究室' },
-  { id: 'friday', weekday: 5, label: '周五', image: friday, theme: 'Yutoko 赤门咖啡' },
-  { id: 'saturday', weekday: 6, label: '周六', image: saturday, theme: 'Yutoko 校园社群' }
+  { id: 'sunday', weekday: 0, label: '周日', image: sunday, theme: '银杏和风' },
+  { id: 'monday', weekday: 1, label: '周一', image: monday, theme: '研究室蓝牌' },
+  { id: 'tuesday', weekday: 2, label: '周二', image: tuesday, theme: '蓝黄校园针织' },
+  { id: 'wednesday', weekday: 3, label: '周三', image: wednesday, theme: '银杏通勤' },
+  { id: 'thursday', weekday: 4, label: '周四', image: thursday, theme: '技术研究室' },
+  { id: 'friday', weekday: 5, label: '周五', image: friday, theme: '赤门咖啡' },
+  { id: 'saturday', weekday: 6, label: '周六', image: saturday, theme: '校园社群' }
 ]
 
 export const neutralMascotImage = neutral

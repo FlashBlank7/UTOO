@@ -84,22 +84,9 @@ async function submit() {
     await auth.fetchMe()
     router.replace(nextPath())
   } catch (e: any) {
-    error.value = registerErrorMessage(e)
+    error.value = e.response?.data?.detail || '注册失败，请检查激活码'
   } finally {
     loading.value = false
   }
-}
-
-function registerErrorMessage(e: any) {
-  const detail = e.response?.data?.detail
-  if (detail === 'Invalid or inactive activation code') return '激活码无效或已停用'
-  if (detail === 'Activation code has reached its usage limit') return '激活码使用次数已满'
-  if (detail === 'Username already taken') return '用户名已被占用'
-  if (detail === 'Email already registered') return '邮箱已注册'
-  if (detail === 'Username is required') return '请填写用户名'
-  if (detail === 'Department is required') return '请填写专攻 / 研究科'
-  if (typeof detail === 'string') return detail
-  if (e.request && !e.response) return '网络连接失败，请稍后再试'
-  return '注册失败，请检查信息后重试'
 }
 </script>

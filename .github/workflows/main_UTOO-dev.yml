@@ -97,9 +97,9 @@ jobs:
               ACCESS_TOKEN_EXPIRE_MINUTES="${{ env.ACCESS_TOKEN_EXPIRE_MINUTES }}" \
               REFRESH_TOKEN_EXPIRE_DAYS="${{ env.REFRESH_TOKEN_EXPIRE_DAYS }}"
 
-      - name: Stop Azure Web App before deploy
+      - name: Ensure Azure Web App is running before deploy
         run: |
-          az webapp stop \
+          az webapp start \
             --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
             --name "${{ env.AZURE_WEBAPP_NAME }}"
 

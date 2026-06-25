@@ -10,14 +10,17 @@ from app.core.agent_keys import agent_key_prefix
 from app.models.agent import Agent
 from app.models.user import User
 
-bearer = HTTPBearer()
+bearer = HTTPBearer(auto_error=False)
 optional_bearer = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: AsyncSession = Depends(get_db),
 ) -> User:
+    if not credentials:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
     try:
         payload = decode_token(credentials.credentials)
         if payload.get("type") != "access":
@@ -42,9 +45,12 @@ async def get_current_admin(user: User = Depends(get_current_user)) -> User:
 
 
 async def get_current_agent(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
     db: AsyncSession = Depends(get_db),
 ) -> Agent:
+    if not credentials:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
     raw_key = credentials.credentials
     if not raw_key.startswith("utoo_agent_"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid agent API key")

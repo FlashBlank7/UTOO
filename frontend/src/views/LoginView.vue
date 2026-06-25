@@ -21,24 +21,34 @@
       </button>
 
       <p class="text-center text-sm text-slate-500">
-        没有账号？<router-link to="/register" class="link">注册</router-link>
+        没有账号？<router-link :to="{ path: '/register', query: nextQuery }" class="link">注册</router-link>
       </p>
     </form>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 const identifier = ref('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
+const nextQuery = computed(() => {
+  const next = typeof route.query.next === 'string' ? route.query.next : ''
+  return next ? { next } : {}
+})
+
+function nextPath() {
+  const next = typeof route.query.next === 'string' ? route.query.next : ''
+  return next.startsWith('/') && !next.startsWith('//') ? next : '/'
+}
 
 async function submit() {
   error.value = ''
@@ -52,7 +62,7 @@ async function submit() {
     const { data } = await api.post('/auth/login', payload)
     auth.setTokens(data.access_token, data.refresh_token)
     await auth.fetchMe()
-    router.push('/')
+    router.replace(nextPath())
   } catch {
     error.value = '登录失败，请检查账号密码'
   } finally {

@@ -37,24 +37,34 @@
       </button>
 
       <p class="text-center text-sm text-slate-500">
-        已有账号？<router-link to="/login" class="link">登录</router-link>
+        已有账号？<router-link :to="{ path: '/login', query: nextQuery }" class="link">登录</router-link>
       </p>
     </form>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 
 const form = ref({ activation_code: '', department: '', password: '', username: '', display_name: '', email: '' })
 const error = ref('')
 const loading = ref(false)
+const nextQuery = computed(() => {
+  const next = typeof route.query.next === 'string' ? route.query.next : ''
+  return next ? { next } : {}
+})
+
+function nextPath() {
+  const next = typeof route.query.next === 'string' ? route.query.next : ''
+  return next.startsWith('/') && !next.startsWith('//') ? next : '/'
+}
 
 async function submit() {
   error.value = ''
@@ -72,7 +82,7 @@ async function submit() {
     const { data } = await api.post('/auth/register', payload)
     auth.setTokens(data.access_token, data.refresh_token)
     await auth.fetchMe()
-    router.push('/')
+    router.replace(nextPath())
   } catch (e: any) {
     error.value = e.response?.data?.detail || '注册失败，请检查激活码'
   } finally {

@@ -168,6 +168,8 @@ bash startup.sh
 DATABASE_URL=sqlite+aiosqlite:////home/data/utoo.db
 SCM_DO_BUILD_DURING_DEPLOYMENT=true
 ALLOWED_ORIGINS=https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net
+ACCESS_TOKEN_EXPIRE_MINUTES=120
+REFRESH_TOKEN_EXPIRE_DAYS=30
 ```
 
 建议在 Azure App Service 的环境变量中手动设置一个生产用密钥：
@@ -186,5 +188,5 @@ DATABASE_URL=postgresql+asyncpg://<user>:<password>@<host>:5432/<database>?ssl=r
 
 ```bash
 curl https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net/health
-curl https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net/api/v1/posts
+curl -i https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net/api/v1/posts
 ```

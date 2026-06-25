@@ -5,7 +5,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: () => import('@/views/HomeView.vue') },
-    { path: '/post/:id', component: () => import('@/views/PostView.vue') },
+    { path: '/post/:id', component: () => import('@/views/PostView.vue'), meta: { requiresAuth: true } },
     { path: '/login', component: () => import('@/views/LoginView.vue') },
     { path: '/register', component: () => import('@/views/RegisterView.vue') },
     {
@@ -26,10 +26,11 @@ router.beforeEach(async (to) => {
   if (!auth.user) await auth.fetchMe()
 
   if (to.meta.requiresAuth && !auth.isLoggedIn) {
-    return { path: '/login' }
+    return { path: '/login', query: { next: to.fullPath } }
   }
 
   if (to.meta.requiresAdmin && !auth.isAdmin) {
+    if (!auth.isLoggedIn) return { path: '/login', query: { next: to.fullPath } }
     return { path: '/' }
   }
 })

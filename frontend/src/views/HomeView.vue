@@ -1,5 +1,53 @@
 <template>
-  <div class="mx-auto max-w-5xl px-4 py-8">
+  <div v-if="!auth.isLoggedIn" class="mx-auto max-w-5xl px-4 py-10 md:py-14">
+    <section class="border-b border-slate-200 pb-10 md:grid md:grid-cols-[minmax(0,1fr)_320px] md:gap-10 md:pb-12">
+      <div>
+        <p class="meta mb-3">Independent student forum</p>
+        <h1 class="max-w-2xl text-4xl font-semibold leading-tight text-slate-950 md:text-5xl">
+          UTOO
+        </h1>
+        <p class="mt-4 max-w-2xl text-base leading-7 text-slate-600">
+          面向 UTokyo 学生的课程、研究室、生活、租房与就职讨论空间。登录后可以阅读帖子、参与回复、发布经验和查看公告。
+        </p>
+        <div class="mt-7 flex flex-col gap-3 sm:flex-row">
+          <router-link to="/login" class="btn-primary text-center">登录进入论坛</router-link>
+          <router-link to="/register" class="btn-secondary text-center">注册账号</router-link>
+        </div>
+      </div>
+
+      <div class="mt-8 border-l-0 border-slate-200 pt-6 md:mt-0 md:border-l md:pl-6 md:pt-0">
+        <div class="mb-4 flex items-center justify-between border-b border-slate-200 pb-2">
+          <span class="text-sm font-semibold text-slate-950">分类入口</span>
+          <span class="meta">login required</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <span v-for="category in categories" :key="category" class="tag justify-center py-1.5">
+            {{ category }}
+          </span>
+        </div>
+        <p class="mt-5 border-t border-slate-200 pt-4 text-xs leading-5 text-slate-500">
+          UTOO is an independent student community and is not an official University of Tokyo service.
+        </p>
+      </div>
+    </section>
+
+    <section class="grid gap-4 py-8 md:grid-cols-3">
+      <div class="border-t border-slate-300 pt-4">
+        <p class="mb-1 text-sm font-semibold text-slate-950">受限阅读</p>
+        <p class="text-sm leading-6 text-slate-600">帖子、评论和公告仅对登录用户开放，避免讨论内容被公开索引。</p>
+      </div>
+      <div class="border-t border-slate-300 pt-4">
+        <p class="mb-1 text-sm font-semibold text-slate-950">社区秩序</p>
+        <p class="text-sm leading-6 text-slate-600">举报、处理队列、禁言和隐藏状态用于保持讨论可读。</p>
+      </div>
+      <div class="border-t border-slate-300 pt-4">
+        <p class="mb-1 text-sm font-semibold text-slate-950">Agent 标记</p>
+        <p class="text-sm leading-6 text-slate-600">自动化账号发帖会明确显示来源，和普通用户内容区分。</p>
+      </div>
+    </section>
+  </div>
+
+  <div v-else class="mx-auto max-w-5xl px-4 py-8">
     <div class="mb-6 flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
       <div>
         <p class="meta mb-1">UTOO Forum</p>
@@ -135,6 +183,7 @@ const writableCategories = computed(() => auth.isAdmin ? ['公告', ...categorie
 const newPost = ref({ title: '', content: '', department_tag: '', category: '闲聊', is_anonymous: false })
 
 async function loadPosts() {
+  if (!auth.isLoggedIn) return
   loading.value = true
   try {
     const params: Record<string, string> = {}
@@ -149,6 +198,7 @@ async function loadPosts() {
 }
 
 async function loadAnnouncements() {
+  if (!auth.isLoggedIn) return
   const { data } = await api.get('/posts', { params: { category: '公告', page_size: 5 } })
   announcements.value = data.filter((post: any) => post.is_pinned)
 }
@@ -192,8 +242,19 @@ function notifyMascot(context: string) {
 }
 
 watch(filterCategory, loadPosts)
+watch(() => auth.isLoggedIn, (loggedIn) => {
+  if (loggedIn) {
+    loadAnnouncements()
+    loadPosts()
+  } else {
+    posts.value = []
+    announcements.value = []
+  }
+})
 onMounted(() => {
-  loadAnnouncements()
-  loadPosts()
+  if (auth.isLoggedIn) {
+    loadAnnouncements()
+    loadPosts()
+  }
 })
 </script>

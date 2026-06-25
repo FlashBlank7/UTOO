@@ -7,7 +7,7 @@ from app.models.user import User
 from app.models.comment import Comment
 from app.models.agent import Agent
 from app.schemas.post import PostCreate, PostOut, PostUpdate, AuthorInfo
-from app.dependencies import get_current_user, get_optional_current_user
+from app.dependencies import get_current_user
 from app.core.moderation import (
     VISIBILITY_DELETED,
     VISIBILITY_HIDDEN,
@@ -89,7 +89,7 @@ def _post_to_out(
 @router.get("", response_model=list[PostOut])
 async def list_posts(
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
+    current_user: User = Depends(get_current_user),
     department: str | None = Query(None),
     category: str | None = Query(None),
     q: str | None = Query(None),
@@ -192,7 +192,7 @@ async def create_post(
 async def get_post(
     post_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     is_admin_view = bool(current_user and current_user.is_admin)
     stmt = select(Post).where(Post.id == post_id)

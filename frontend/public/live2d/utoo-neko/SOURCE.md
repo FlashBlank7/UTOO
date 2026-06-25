@@ -13,3 +13,6 @@ Replacement requirements:
 - Keep total model resources under 50 MB for Azure Free tier.
 - Add source, author, and usage terms here before committing a real model.
 - The character must be adult-coded, family-safe, and avoid nudity, exposed nipples/genitals, transparent underwear, or strongly sexualized motion.
+- Use UTokyo-inspired motifs only: blue/yellow accents, ginkgo leaves, akamon-red charms, research badges, and student-community accessories.
+- Do not embed the official University of Tokyo logo, logotype, emblem, or readable official university text unless explicit permission has been obtained.
+- UTOO is an independent student community and is not an official University of Tokyo service.

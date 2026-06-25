@@ -6,7 +6,7 @@ from app.models.comment import Comment
 from app.models.post import Post
 from app.models.user import User
 from app.schemas.post import CommentCreate, CommentOut, AuthorInfo
-from app.dependencies import get_current_user, get_optional_current_user
+from app.dependencies import get_current_user
 from app.core.moderation import (
     VISIBILITY_DELETED,
     VISIBILITY_HIDDEN,
@@ -75,7 +75,7 @@ def _comment_to_out(comment: Comment, author: User, viewer: User | None = None) 
 async def list_comments(
     post_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     post_result = await db.execute(
         select(Post).where(

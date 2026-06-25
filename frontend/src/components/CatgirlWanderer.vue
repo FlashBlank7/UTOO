@@ -45,7 +45,6 @@
       />
 
       <span v-if="loadState === 'loading'" class="mascot-companion__status">Live2D</span>
-      <span v-else-if="usingFallback" class="mascot-companion__status mascot-companion__status--muted">PNG</span>
     </div>
 
     <div class="mascot-companion__tools">
@@ -195,8 +194,8 @@ function initPosition() {
 function getCompanionSize() {
   const mobile = window.innerWidth <= 640
   return {
-    width: mobile ? 150 : 230,
-    height: mobile ? 210 : 310
+    width: mobile ? 165 : 270,
+    height: mobile ? 230 : 350
   }
 }
 
@@ -405,8 +404,8 @@ function loadScriptOnce(src: string, id: string) {
 function getLive2DCanvasSize() {
   const mobile = window.innerWidth <= 640
   return {
-    width: mobile ? 124 : 210,
-    height: mobile ? 188 : 292
+    width: mobile ? 140 : 240,
+    height: mobile ? 205 : 330
   }
 }
 
@@ -497,15 +496,15 @@ watch(() => route.path, () => {
   left: 0;
   top: 0;
   z-index: 35;
-  width: 230px;
-  height: 310px;
+  width: 270px;
+  height: 350px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-rows: 1fr;
   align-items: end;
   gap: 6px 8px;
   opacity: 0;
-  transition: opacity 180ms ease;
+  transition: opacity 120ms ease;
   will-change: transform;
 }
 
@@ -521,7 +520,7 @@ watch(() => route.path, () => {
   pointer-events: auto;
   position: absolute;
   right: 36px;
-  bottom: 236px;
+  bottom: 268px;
   max-width: min(240px, calc(100vw - 120px));
   border: 1px solid #94a3b8;
   background: rgba(248, 250, 252, 0.96);
@@ -547,8 +546,8 @@ watch(() => route.path, () => {
   pointer-events: auto;
   position: relative;
   grid-column: 1 / 2;
-  width: 190px;
-  height: 270px;
+  width: 220px;
+  height: 320px;
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -587,7 +586,7 @@ watch(() => route.path, () => {
   right: 10px;
   bottom: 0;
   display: block;
-  width: 126px;
+  width: 160px;
   height: auto;
   user-select: none;
   animation: mascot-breathe 4.8s ease-in-out infinite;
@@ -604,12 +603,6 @@ watch(() => route.path, () => {
   padding: 1px 5px;
   font-size: 10px;
   font-weight: 700;
-}
-
-.mascot-companion__status--muted {
-  border-color: #cbd5e1;
-  background: rgba(248, 250, 252, 0.86);
-  color: #64748b;
 }
 
 .mascot-companion__tools {
@@ -659,24 +652,24 @@ watch(() => route.path, () => {
 
 @media (max-width: 640px) {
   .mascot-companion {
-    width: 150px;
-    height: 210px;
+    width: 165px;
+    height: 230px;
     gap: 4px 5px;
   }
 
   .mascot-companion__body {
-    width: 112px;
-    height: 188px;
+    width: 125px;
+    height: 205px;
   }
 
   .mascot-companion__fallback {
     right: 3px;
-    width: 78px;
+    width: 96px;
   }
 
   .mascot-companion__bubble {
     right: 28px;
-    bottom: 152px;
+    bottom: 168px;
     max-width: min(210px, calc(100vw - 52px));
     font-size: 11px;
   }

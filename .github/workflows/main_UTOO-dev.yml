@@ -12,6 +12,8 @@ env:
   AZURE_WEBAPP_PACKAGE_PATH: backend
   ALLOWED_ORIGINS: https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net
   DATABASE_URL: sqlite+aiosqlite:////home/data/utoo.db
+  ACCESS_TOKEN_EXPIRE_MINUTES: "120"
+  REFRESH_TOKEN_EXPIRE_DAYS: "30"
   NODE_VERSION: "20"
   PYTHON_VERSION: "3.12"
 
@@ -74,7 +76,9 @@ jobs:
             --settings \
               SCM_DO_BUILD_DURING_DEPLOYMENT=true \
               ALLOWED_ORIGINS="${{ env.ALLOWED_ORIGINS }}" \
-              DATABASE_URL="${{ env.DATABASE_URL }}"
+              DATABASE_URL="${{ env.DATABASE_URL }}" \
+              ACCESS_TOKEN_EXPIRE_MINUTES="${{ env.ACCESS_TOKEN_EXPIRE_MINUTES }}" \
+              REFRESH_TOKEN_EXPIRE_DAYS="${{ env.REFRESH_TOKEN_EXPIRE_DAYS }}"
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3

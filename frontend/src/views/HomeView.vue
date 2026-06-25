@@ -142,6 +142,7 @@ async function loadPosts() {
     if (appliedSearch.value) params.q = appliedSearch.value
     const { data } = await api.get('/posts', { params })
     posts.value = data
+    if (data.length === 0) notifyMascot('empty-list')
   } finally {
     loading.value = false
   }
@@ -152,9 +153,10 @@ async function loadAnnouncements() {
   announcements.value = data.filter((post: any) => post.is_pinned)
 }
 
-function applySearch() {
+async function applySearch() {
   appliedSearch.value = searchText.value.trim()
-  loadPosts()
+  await loadPosts()
+  if (appliedSearch.value) notifyMascot('search-applied')
 }
 
 async function submitPost() {
@@ -172,6 +174,7 @@ async function submitPost() {
     showNewPost.value = false
     newPost.value = { title: '', content: '', department_tag: '', category: '闲聊', is_anonymous: false }
     await loadPosts()
+    notifyMascot('post-created')
   } catch (e: any) {
     postError.value = e.response?.data?.detail || '发布失败'
   } finally {
@@ -182,6 +185,10 @@ async function submitPost() {
 function formatTime(iso: string) {
   const d = new Date(iso)
   return d.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function notifyMascot(context: string) {
+  window.dispatchEvent(new CustomEvent('utoo:mascot-react', { detail: { context } }))
 }
 
 watch(filterCategory, loadPosts)

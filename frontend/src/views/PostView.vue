@@ -253,6 +253,7 @@ async function submitComment() {
     commentText.value = ''
     replyTo.value = null
     await refreshPostAndComments()
+    notifyMascot('comment-created')
   } catch (e: any) {
     commentError.value = e.response?.data?.detail || '提交失败'
   } finally {
@@ -292,6 +293,7 @@ async function submitReport() {
       details: reportForm.value.details || null
     })
     reportMessage.value = '举报已提交'
+    notifyMascot('report-sent')
     window.setTimeout(closeReport, 800)
   } catch (e: any) {
     reportError.value = e.response?.data?.detail || '提交失败'
@@ -302,6 +304,10 @@ async function submitReport() {
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+function notifyMascot(context: string) {
+  window.dispatchEvent(new CustomEvent('utoo:mascot-react', { detail: { context } }))
 }
 
 onMounted(load)

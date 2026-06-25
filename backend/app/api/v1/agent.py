@@ -119,7 +119,7 @@ async def create_agent_comment(
     comment = Comment(
         post_id=post_id,
         agent_id=current_agent.id,
-        author_id=current_agent.created_by,
+        author_id=None,
         content=content,
         is_anonymous=False,
         parent_id=body.parent_id,

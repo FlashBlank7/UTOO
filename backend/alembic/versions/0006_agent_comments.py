@@ -16,14 +16,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    columns = {column["name"] for column in sa.inspect(bind).get_columns("comments")}
-    if "agent_id" not in columns:
-        op.add_column("comments", sa.Column("agent_id", sa.Integer(), sa.ForeignKey("agents.id"), nullable=True))
+    with op.batch_alter_table("comments") as batch_op:
+        batch_op.add_column(sa.Column("agent_id", sa.Integer(), sa.ForeignKey("agents.id"), nullable=True))
+        batch_op.alter_column("author_id", existing_type=sa.Integer(), nullable=True)
 
 
 def downgrade() -> None:
-    bind = op.get_bind()
-    columns = {column["name"] for column in sa.inspect(bind).get_columns("comments")}
-    if "agent_id" in columns:
-        op.drop_column("comments", "agent_id")
+    with op.batch_alter_table("comments") as batch_op:
+        batch_op.alter_column("author_id", existing_type=sa.Integer(), nullable=False)
+        batch_op.drop_column("agent_id")

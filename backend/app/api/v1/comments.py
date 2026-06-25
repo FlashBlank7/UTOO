@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.db.session import get_db
 from app.models.comment import Comment
+from app.models.agent import Agent
 from app.models.post import Post
 from app.models.user import User
 from app.schemas.post import CommentCreate, CommentOut, AuthorInfo
@@ -26,10 +27,19 @@ ANON_DISPLAY = "匿名用户"
 def _author_info(user: User, is_anonymous: bool) -> AuthorInfo:
     if is_anonymous:
         return AuthorInfo(display_name=ANON_DISPLAY)
-    return AuthorInfo(display_name=user.display_name or f"用户{user.id}", department=user.department)
+    return AuthorInfo(display_name=user.display_name or f"用户{user.id}", department=user.department, source="user", id=user.id)
 
 
-def _comment_to_out(comment: Comment, author: User, viewer: User | None = None) -> CommentOut:
+def _agent_author_info(agent: Agent) -> AuthorInfo:
+    return AuthorInfo(display_name=agent.name, source="agent", id=agent.id)
+
+
+def _comment_to_out(
+    comment: Comment,
+    author: User | None,
+    viewer: User | None = None,
+    agent: Agent | None = None,
+) -> CommentOut:
     can_delete = bool(viewer and (viewer.is_admin or comment.author_id == viewer.id))
     if comment.is_deleted:
         return CommentOut(
@@ -57,6 +67,12 @@ def _comment_to_out(comment: Comment, author: User, viewer: User | None = None) 
             author=AuthorInfo(display_name="已隐藏"),
             can_delete=False,
         )
+    if agent:
+        author_info = _agent_author_info(agent)
+    elif author:
+        author_info = _author_info(author, comment.is_anonymous)
+    else:
+        author_info = AuthorInfo(display_name="未知作者", source="user")
     return CommentOut(
         id=comment.id,
         content=comment.content,
@@ -66,7 +82,7 @@ def _comment_to_out(comment: Comment, author: User, viewer: User | None = None) 
         is_deleted=False,
         deleted_at=comment.deleted_at,
         created_at=comment.created_at,
-        author=_author_info(author, comment.is_anonymous),
+        author=author_info,
         can_delete=can_delete,
     )
 
@@ -96,12 +112,25 @@ async def list_comments(
     if not comments:
         return []
 
-    author_ids = list({c.author_id for c in comments})
-    users_result = await db.execute(select(User).where(User.id.in_(author_ids)))
-    users = {u.id: u for u in users_result.scalars().all()}
+    author_ids = list({c.author_id for c in comments if c.author_id is not None})
+    users = {}
+    if author_ids:
+        users_result = await db.execute(select(User).where(User.id.in_(author_ids)))
+        users = {u.id: u for u in users_result.scalars().all()}
+
+    agent_ids = list({c.agent_id for c in comments if c.agent_id is not None})
+    agents = {}
+    if agent_ids:
+        agents_result = await db.execute(select(Agent).where(Agent.id.in_(agent_ids)))
+        agents = {a.id: a for a in agents_result.scalars().all()}
 
     return [
-        _comment_to_out(c, users[c.author_id], current_user)
+        _comment_to_out(
+            c,
+            users.get(c.author_id) if c.author_id is not None else None,
+            current_user,
+            agents.get(c.agent_id) if c.agent_id is not None else None,
+        )
         for c in comments
     ]
 

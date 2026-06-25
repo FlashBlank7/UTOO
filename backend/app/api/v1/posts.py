@@ -18,6 +18,7 @@ from app.core.moderation import (
     ensure_can_publish,
     set_post_visibility,
 )
+from app.core.yutoko import maybe_create_yutoko_comment
 
 router = APIRouter()
 
@@ -183,9 +184,10 @@ async def create_post(
     await db.flush()
     if post.visibility == VISIBILITY_HIDDEN:
         await create_sensitive_report(db, "post", post.id, "Post matched sensitive words")
+    yutoko_comment = await maybe_create_yutoko_comment(db, post)
     await db.commit()
     await db.refresh(post)
-    return _post_to_out(post, current_user, 0)
+    return _post_to_out(post, current_user, 1 if yutoko_comment else 0)
 
 
 @router.get("/{post_id}", response_model=PostOut)

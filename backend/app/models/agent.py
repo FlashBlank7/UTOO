@@ -23,3 +23,4 @@ class Agent(Base):
     last_posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     posts = relationship("Post", back_populates="agent", lazy="noload")
+    comments = relationship("Comment", back_populates="agent", lazy="noload")

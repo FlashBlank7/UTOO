@@ -3,13 +3,13 @@
     v-if="canRender"
     ref="rootEl"
     class="mascot-companion"
-    :class="{
+    :class="[{
       'mascot-companion--ready': ready,
       'mascot-companion--dragging': dragging,
       'mascot-companion--fallback': usingFallback,
       'mascot-companion--live2d': live2dReady,
       'mascot-companion--reduced': reducedMotion
-    }"
+    }, poseClass]"
     :style="positionStyle"
     @pointermove="focusLive2D"
   >
@@ -131,6 +131,8 @@ const currentOutfit = computed(() => {
 const canRender = computed(() => !hidden.value && canAppear())
 const usingFallback = computed(() => live2dDisabled.value || !live2dReady.value)
 const companionLabel = computed(() => `UTOO 常驻看板娘，${currentOutfit.value.theme}`)
+const mascotPose = computed(() => readMascotPose())
+const poseClass = computed(() => `mascot-companion--${mascotPose.value}`)
 const positionStyle = computed(() => ({
   transform: `translate3d(${Math.round(position.value.x)}px, ${Math.round(position.value.y)}px, 0)`
 }))
@@ -144,6 +146,15 @@ function routeContext() {
   if (route.path.startsWith('/post/')) return 'post'
   if (route.path === '/login') return 'login'
   if (route.path === '/register') return 'register'
+  return 'home'
+}
+
+function readMascotPose() {
+  const params = new URLSearchParams(window.location.search)
+  const raw = params.get('mascotPose')
+  if (raw === 'home' || raw === 'post' || raw === 'auth') return raw
+  if (route.path.startsWith('/post/')) return 'post'
+  if (route.path === '/login' || route.path === '/register') return 'auth'
   return 'home'
 }
 
@@ -184,24 +195,53 @@ function initPosition() {
     position.value = clampPosition(saved.x, saved.y, size)
     return
   }
-  position.value = clampPosition(
-    window.innerWidth - size.width - 24,
-    window.innerHeight - size.height - 20,
-    size
-  )
+  const next = defaultPosition(size)
+  position.value = clampPosition(next.x, next.y, size)
 }
 
 function getCompanionSize() {
   const mobile = window.innerWidth <= 640
+  if (mascotPose.value === 'post') {
+    return {
+      width: mobile ? 150 : 225,
+      height: mobile ? 200 : 270
+    }
+  }
+  if (mascotPose.value === 'auth') {
+    return {
+      width: mobile ? 125 : 190,
+      height: mobile ? 165 : 245
+    }
+  }
   return {
     width: mobile ? 165 : 270,
     height: mobile ? 230 : 350
   }
 }
 
+function defaultPosition(size = getCompanionSize()) {
+  const mobile = window.innerWidth <= 640
+  if (mascotPose.value === 'post') {
+    return {
+      x: window.innerWidth - size.width - (mobile ? 8 : 18),
+      y: mobile ? 66 : 92
+    }
+  }
+  if (mascotPose.value === 'auth') {
+    return {
+      x: window.innerWidth - size.width - (mobile ? 6 : 22),
+      y: mobile ? 70 : 138
+    }
+  }
+  return {
+    x: window.innerWidth - size.width - 24,
+    y: window.innerHeight - size.height - 20
+  }
+}
+
 function readStoredPosition() {
   try {
-    const raw = window.localStorage.getItem(positionKey)
+    const raw = window.localStorage.getItem(`${positionKey}:${mascotPose.value}`)
     if (!raw) return null
     const data = JSON.parse(raw) as { x?: number; y?: number }
     if (typeof data.x !== 'number' || typeof data.y !== 'number') return null
@@ -212,7 +252,7 @@ function readStoredPosition() {
 }
 
 function storePosition() {
-  window.localStorage.setItem(positionKey, JSON.stringify(position.value))
+  window.localStorage.setItem(`${positionKey}:${mascotPose.value}`, JSON.stringify(position.value))
 }
 
 function clampPosition(x: number, y: number, size = getCompanionSize()) {
@@ -403,6 +443,18 @@ function loadScriptOnce(src: string, id: string) {
 
 function getLive2DCanvasSize() {
   const mobile = window.innerWidth <= 640
+  if (mascotPose.value === 'post') {
+    return {
+      width: mobile ? 126 : 190,
+      height: mobile ? 178 : 248
+    }
+  }
+  if (mascotPose.value === 'auth') {
+    return {
+      width: mobile ? 105 : 160,
+      height: mobile ? 148 : 225
+    }
+  }
   return {
     width: mobile ? 140 : 240,
     height: mobile ? 205 : 330
@@ -482,8 +534,9 @@ onBeforeUnmount(() => {
   disposeLive2D()
 })
 
-watch(() => route.path, () => {
+watch(() => route.fullPath, () => {
   if (!canAppear()) return
+  initPosition()
   showMessage(pickLine(routeMessages[routeContext()]), 4200)
   scheduleLive2DLoad(250)
 })
@@ -592,6 +645,54 @@ watch(() => route.path, () => {
   animation: mascot-breathe 4.8s ease-in-out infinite;
 }
 
+.mascot-companion--post {
+  width: 225px;
+  height: 270px;
+}
+
+.mascot-companion--post .mascot-companion__body {
+  width: 178px;
+  height: 242px;
+}
+
+.mascot-companion--post .mascot-companion__fallback {
+  right: 6px;
+  width: 120px;
+  transform: rotate(-5deg);
+}
+
+.mascot-companion--post .mascot-companion__bubble {
+  right: 30px;
+  bottom: 204px;
+}
+
+.mascot-companion--auth {
+  width: 190px;
+  height: 245px;
+}
+
+.mascot-companion--auth .mascot-companion__body {
+  pointer-events: none;
+  width: 152px;
+  height: 220px;
+  filter: drop-shadow(0 8px 12px rgba(15, 23, 42, 0.12));
+}
+
+.mascot-companion--auth .mascot-companion__fallback {
+  right: 0;
+  width: 108px;
+}
+
+.mascot-companion--auth .mascot-companion__bubble {
+  right: 20px;
+  bottom: 182px;
+  max-width: min(210px, calc(100vw - 90px));
+}
+
+.mascot-companion--auth .mascot-companion__tools {
+  display: none;
+}
+
 .mascot-companion__status {
   position: absolute;
   right: 8px;
@@ -677,6 +778,45 @@ watch(() => route.path, () => {
   .mascot-companion__tools {
     padding-bottom: 22px;
     opacity: 0.9;
+  }
+
+  .mascot-companion--post {
+    width: 150px;
+    height: 200px;
+  }
+
+  .mascot-companion--post .mascot-companion__body {
+    width: 112px;
+    height: 178px;
+  }
+
+  .mascot-companion--post .mascot-companion__fallback {
+    width: 82px;
+  }
+
+  .mascot-companion--post .mascot-companion__bubble {
+    right: 20px;
+    bottom: 146px;
+  }
+
+  .mascot-companion--auth {
+    width: 125px;
+    height: 165px;
+  }
+
+  .mascot-companion--auth .mascot-companion__body {
+    width: 96px;
+    height: 145px;
+  }
+
+  .mascot-companion--auth .mascot-companion__fallback {
+    width: 68px;
+  }
+
+  .mascot-companion--auth .mascot-companion__bubble {
+    right: 12px;
+    bottom: 118px;
+    max-width: min(180px, calc(100vw - 50px));
   }
 }
 

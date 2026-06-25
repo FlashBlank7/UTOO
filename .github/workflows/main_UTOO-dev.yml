@@ -75,6 +75,7 @@ jobs:
             --name "${{ env.AZURE_WEBAPP_NAME }}" \
             --settings \
               SCM_DO_BUILD_DURING_DEPLOYMENT=true \
+              ENABLE_ORYX_BUILD=true \
               ALLOWED_ORIGINS="${{ env.ALLOWED_ORIGINS }}" \
               DATABASE_URL="${{ env.DATABASE_URL }}" \
               ACCESS_TOKEN_EXPIRE_MINUTES="${{ env.ACCESS_TOKEN_EXPIRE_MINUTES }}" \

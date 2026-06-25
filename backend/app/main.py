@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1 import auth, posts, comments, admin, agent
+from app.api.v1 import auth, posts, comments, admin, agent, reports
 from app.core.config import settings
 
 app = FastAPI(title="UTOO", version="0.1.0")
@@ -23,6 +23,7 @@ app.include_router(posts.router, prefix="/api/v1/posts", tags=["posts"])
 app.include_router(comments.router, prefix="/api/v1/comments", tags=["comments"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 app.include_router(agent.router, prefix="/api/v1/agent", tags=["agent"])
+app.include_router(reports.router, prefix="/api/v1/reports", tags=["reports"])
 
 
 @app.get("/health")

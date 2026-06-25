@@ -84,6 +84,7 @@
               <th class="px-4 py-3 text-left">昵称</th>
               <th class="px-4 py-3 text-left">专攻</th>
               <th class="px-4 py-3 text-center">角色</th>
+              <th class="px-4 py-3 text-center">状态</th>
               <th class="px-4 py-3 text-center">注册时间</th>
               <th class="px-4 py-3 text-center">操作</th>
             </tr>
@@ -97,9 +98,17 @@
               <td class="px-4 py-3 text-center">
                 <span :class="u.is_admin ? 'tag-accent' : 'tag'">{{ u.is_admin ? '管理员' : '用户' }}</span>
               </td>
+              <td class="px-4 py-3 text-center">
+                <span v-if="u.is_banned" class="tag border-red-300 bg-red-50 text-red-700">封禁</span>
+                <span v-else-if="u.muted_until" class="tag border-amber-300 bg-amber-50 text-amber-700">禁言</span>
+                <span v-else class="tag">正常</span>
+              </td>
               <td class="px-4 py-3 text-center text-slate-500">{{ formatDate(u.created_at) }}</td>
               <td class="px-4 py-3 text-center">
                 <button @click="openReset(u)" class="link text-xs">重置密码</button>
+                <button @click="muteUser(u)" class="ml-3 text-xs text-amber-700 hover:underline">禁言1天</button>
+                <button v-if="u.muted_until" @click="unmuteUser(u)" class="ml-3 text-xs text-slate-600 hover:underline">解除禁言</button>
+                <button @click="toggleBan(u)" class="ml-3 text-xs text-red-600 hover:underline">{{ u.is_banned ? '解封' : '封禁' }}</button>
               </td>
             </tr>
           </tbody>
@@ -116,6 +125,7 @@
               <th class="px-4 py-3 text-left">标题</th>
               <th class="px-4 py-3 text-center">来源</th>
               <th class="px-4 py-3 text-center">分类</th>
+              <th class="px-4 py-3 text-center">状态</th>
               <th class="px-4 py-3 text-center">回复</th>
               <th class="px-4 py-3 text-center">创建时间</th>
               <th class="px-4 py-3 text-center">操作</th>
@@ -133,16 +143,102 @@
                 </span>
               </td>
               <td class="px-4 py-3 text-center"><span class="tag">{{ post.category }}</span></td>
+              <td class="px-4 py-3 text-center"><span :class="visibilityClass(post.visibility)">{{ visibilityLabel(post.visibility) }}</span></td>
               <td class="px-4 py-3 text-center text-slate-600">{{ post.comment_count }}</td>
               <td class="px-4 py-3 text-center text-slate-500">{{ formatDate(post.created_at) }}</td>
               <td class="px-4 py-3 text-center">
                 <button @click="togglePinned(post)" class="link text-xs">{{ post.is_pinned ? '取消置顶' : '置顶' }}</button>
+                <button @click="setPostVisibility(post, post.visibility === 'hidden' ? 'normal' : 'hidden')" class="ml-3 text-xs text-amber-700 hover:underline">{{ post.visibility === 'hidden' ? '恢复' : '隐藏' }}</button>
                 <button @click="deletePost(post)" class="ml-3 text-xs text-red-600 hover:underline">删除</button>
               </td>
             </tr>
           </tbody>
         </table>
         <div v-if="posts.length === 0" class="py-8 text-center text-sm text-slate-500">暂无帖子</div>
+      </div>
+    </template>
+
+    <template v-if="activeTab === 'announcements'">
+      <form @submit.prevent="createAnnouncement" class="panel mb-4 bg-white p-4 space-y-3">
+        <input v-model.trim="announcement.title" required class="input" placeholder="公告标题" />
+        <textarea v-model.trim="announcement.content" required class="input h-28 resize-none" placeholder="公告内容"></textarea>
+        <p v-if="announcementError" class="text-sm text-red-600">{{ announcementError }}</p>
+        <button type="submit" :disabled="creatingAnnouncement" class="btn-primary">{{ creatingAnnouncement ? '发布中...' : '发布公告' }}</button>
+      </form>
+      <div class="panel divide-y divide-slate-200 overflow-hidden">
+        <div v-for="post in announcements" :key="post.id" class="bg-white px-4 py-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <router-link :to="`/post/${post.id}`" class="font-medium text-slate-950 hover:underline">{{ post.title }}</router-link>
+            <span :class="visibilityClass(post.visibility)">{{ visibilityLabel(post.visibility) }}</span>
+            <button @click="togglePinned(post)" class="link ml-auto text-xs">{{ post.is_pinned ? '取消置顶' : '置顶' }}</button>
+          </div>
+          <p class="mt-1 line-clamp-2 text-sm text-slate-600">{{ post.content }}</p>
+        </div>
+        <div v-if="announcements.length === 0" class="py-8 text-center text-sm text-slate-500">暂无公告</div>
+      </div>
+    </template>
+
+    <template v-if="activeTab === 'reports'">
+      <div class="mb-4 flex gap-2">
+        <button @click="reportStatus = 'pending'; loadReports()" :class="reportStatus === 'pending' ? 'btn-primary' : 'btn-secondary'">待处理</button>
+        <button @click="reportStatus = 'resolved'; loadReports()" :class="reportStatus === 'resolved' ? 'btn-primary' : 'btn-secondary'">已处理</button>
+      </div>
+      <div class="panel overflow-x-auto">
+        <table class="w-full min-w-[900px] text-sm">
+          <thead class="table-head">
+            <tr>
+              <th class="px-4 py-3 text-left">目标</th>
+              <th class="px-4 py-3 text-left">原因</th>
+              <th class="px-4 py-3 text-left">说明</th>
+              <th class="px-4 py-3 text-center">状态</th>
+              <th class="px-4 py-3 text-center">时间</th>
+              <th class="px-4 py-3 text-center">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="report in reports" :key="report.id" class="table-row">
+              <td class="px-4 py-3">{{ report.target_type }} #{{ report.target_id }}</td>
+              <td class="px-4 py-3">{{ report.reason }}</td>
+              <td class="px-4 py-3 text-slate-600">{{ report.details || '-' }}</td>
+              <td class="px-4 py-3 text-center"><span class="tag">{{ report.status }}</span></td>
+              <td class="px-4 py-3 text-center text-slate-500">{{ formatDate(report.created_at) }}</td>
+              <td class="px-4 py-3 text-center">
+                <template v-if="report.status === 'pending'">
+                  <button @click="handleReport(report, 'resolve')" class="link text-xs">标记处理</button>
+                  <button @click="handleReport(report, 'hide')" class="ml-3 text-xs text-amber-700 hover:underline">隐藏</button>
+                  <button @click="handleReport(report, 'delete')" class="ml-3 text-xs text-red-600 hover:underline">删除</button>
+                  <button @click="handleReport(report, 'mute')" class="ml-3 text-xs text-slate-600 hover:underline">禁言作者</button>
+                </template>
+                <span v-else class="text-xs text-slate-500">{{ report.resolution || '-' }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="reports.length === 0" class="py-8 text-center text-sm text-slate-500">暂无举报</div>
+      </div>
+    </template>
+
+    <template v-if="activeTab === 'logs'">
+      <div class="panel overflow-x-auto">
+        <table class="w-full min-w-[760px] text-sm">
+          <thead class="table-head">
+            <tr>
+              <th class="px-4 py-3 text-left">动作</th>
+              <th class="px-4 py-3 text-center">目标</th>
+              <th class="px-4 py-3 text-left">原因</th>
+              <th class="px-4 py-3 text-center">时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="log in moderationLogs" :key="log.id" class="table-row">
+              <td class="px-4 py-3 font-medium text-slate-900">{{ log.action }}</td>
+              <td class="px-4 py-3 text-center">{{ log.target_type }} #{{ log.target_id }}</td>
+              <td class="px-4 py-3 text-slate-600">{{ log.reason || '-' }}</td>
+              <td class="px-4 py-3 text-center text-slate-500">{{ formatDate(log.created_at) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="moderationLogs.length === 0" class="py-8 text-center text-sm text-slate-500">暂无日志</div>
       </div>
     </template>
 
@@ -231,12 +327,18 @@ const tabs = [
   { key: 'codes', label: '激活码' },
   { key: 'users', label: '用户' },
   { key: 'posts', label: '内容' },
+  { key: 'announcements', label: '公告' },
+  { key: 'reports', label: '处理队列' },
+  { key: 'logs', label: '操作日志' },
   { key: 'agents', label: 'Agent' }
 ]
 const activeTab = ref('codes')
 const codes = ref<any[]>([])
 const users = ref<any[]>([])
 const posts = ref<any[]>([])
+const announcements = ref<any[]>([])
+const reports = ref<any[]>([])
+const moderationLogs = ref<any[]>([])
 const agents = ref<any[]>([])
 const newMaxUses = ref(20)
 const generating = ref(false)
@@ -251,6 +353,10 @@ const newAgent = ref({ name: '', description: '' })
 const creatingAgent = ref(false)
 const agentError = ref('')
 const revealedAgentKey = ref('')
+const reportStatus = ref('pending')
+const announcement = ref({ title: '', content: '' })
+const creatingAnnouncement = ref(false)
+const announcementError = ref('')
 
 async function loadCodes() {
   const { data } = await api.get('/admin/codes')
@@ -265,6 +371,21 @@ async function loadUsers() {
 async function loadPosts() {
   const { data } = await api.get('/posts', { params: { page_size: 100 } })
   posts.value = data
+}
+
+async function loadAnnouncements() {
+  const { data } = await api.get('/posts', { params: { category: '公告', page_size: 100 } })
+  announcements.value = data
+}
+
+async function loadReports() {
+  const { data } = await api.get('/admin/reports', { params: { status: reportStatus.value } })
+  reports.value = data
+}
+
+async function loadModerationLogs() {
+  const { data } = await api.get('/admin/moderation-logs')
+  moderationLogs.value = data
 }
 
 async function loadAgents() {
@@ -323,6 +444,21 @@ async function resetPassword() {
   }
 }
 
+async function muteUser(user: any) {
+  await api.patch(`/admin/users/${user.id}/moderation`, { mute_days: 1, reason: 'manual mute' })
+  await loadUsers()
+}
+
+async function unmuteUser(user: any) {
+  await api.patch(`/admin/users/${user.id}/moderation`, { clear_mute: true, reason: 'manual unmute' })
+  await loadUsers()
+}
+
+async function toggleBan(user: any) {
+  await api.patch(`/admin/users/${user.id}/moderation`, { is_banned: !user.is_banned, reason: 'manual moderation' })
+  await loadUsers()
+}
+
 async function togglePinned(post: any) {
   await api.patch(`/posts/${post.id}`, { is_pinned: !post.is_pinned })
   await loadPosts()
@@ -330,8 +466,37 @@ async function togglePinned(post: any) {
 
 async function deletePost(post: any) {
   if (!window.confirm('确认删除这篇帖子？')) return
-  await api.delete(`/posts/${post.id}`)
+  await api.patch(`/admin/posts/${post.id}/visibility`, { visibility: 'deleted', reason: 'manual delete' })
   await loadPosts()
+}
+
+async function setPostVisibility(post: any, visibility: string) {
+  await api.patch(`/admin/posts/${post.id}/visibility`, { visibility, reason: 'manual visibility change' })
+  await loadPosts()
+  await loadAnnouncements()
+}
+
+async function createAnnouncement() {
+  announcementError.value = ''
+  creatingAnnouncement.value = true
+  try {
+    await api.post('/admin/announcements', announcement.value)
+    announcement.value = { title: '', content: '' }
+    await loadAnnouncements()
+  } catch (e: any) {
+    announcementError.value = e.response?.data?.detail || '发布失败'
+  } finally {
+    creatingAnnouncement.value = false
+  }
+}
+
+async function handleReport(report: any, action: string) {
+  const payload: Record<string, any> = { action, resolution: action }
+  if (action === 'mute') payload.mute_days = 1
+  await api.patch(`/admin/reports/${report.id}`, payload)
+  await loadReports()
+  await loadPosts()
+  await loadModerationLogs()
 }
 
 async function createAgent() {
@@ -367,10 +532,25 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+function visibilityLabel(visibility: string) {
+  if (visibility === 'hidden') return '隐藏'
+  if (visibility === 'deleted') return '删除'
+  return '正常'
+}
+
+function visibilityClass(visibility: string) {
+  if (visibility === 'hidden') return 'tag border-amber-300 bg-amber-50 text-amber-700'
+  if (visibility === 'deleted') return 'tag border-red-300 bg-red-50 text-red-700'
+  return 'tag'
+}
+
 watch(activeTab, (tab) => {
   if (tab === 'users') loadUsers()
   if (tab === 'codes') loadCodes()
   if (tab === 'posts') loadPosts()
+  if (tab === 'announcements') loadAnnouncements()
+  if (tab === 'reports') loadReports()
+  if (tab === 'logs') loadModerationLogs()
   if (tab === 'agents') loadAgents()
 })
 

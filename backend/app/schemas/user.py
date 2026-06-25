@@ -9,6 +9,8 @@ class UserOut(BaseModel):
     department: str
     email: EmailStr | None = None
     is_admin: bool
+    is_banned: bool = False
+    muted_until: datetime | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

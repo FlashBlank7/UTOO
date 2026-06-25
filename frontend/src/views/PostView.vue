@@ -23,6 +23,7 @@
             <button v-if="post.can_edit" @click="openEdit" class="btn-secondary">编辑</button>
             <button v-if="post.can_delete" @click="deletePost" class="btn-danger">删除</button>
           </div>
+          <button v-else-if="auth.isLoggedIn" @click="openReport('post', post.id)" class="btn-secondary shrink-0">举报</button>
         </div>
         <p class="whitespace-pre-wrap text-sm leading-7 text-slate-700">{{ post.content }}</p>
       </article>
@@ -62,10 +63,10 @@
           class="panel bg-white p-4"
           :class="c.is_deleted ? 'bg-slate-50' : ''"
         >
-          <CommentBlock :comment="c" @reply="replyTo = $event" @remove="deleteComment" />
+          <CommentBlock :comment="c" @reply="replyTo = $event" @remove="deleteComment" @report="openReport('comment', $event)" />
 
           <div v-for="r in repliesOf(c.id)" :key="r.id" class="ml-4 mt-3 border-l border-slate-200 pl-3">
-            <CommentBlock :comment="r" @reply="replyTo = $event" @remove="deleteComment" />
+            <CommentBlock :comment="r" @reply="replyTo = $event" @remove="deleteComment" @report="openReport('comment', $event)" />
           </div>
         </section>
       </div>
@@ -91,6 +92,29 @@
             <div class="flex justify-end gap-3 pt-2">
               <button type="button" @click="showEdit = false" class="btn-secondary">取消</button>
               <button type="submit" :disabled="savingPost" class="btn-primary">{{ savingPost ? '保存中...' : '保存' }}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div v-if="reportTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+        <div class="panel w-full max-w-md bg-white p-5">
+          <div class="mb-4 border-b border-slate-200 pb-3">
+            <h2 class="text-base font-semibold text-slate-950">举报内容</h2>
+          </div>
+          <form @submit.prevent="submitReport" class="space-y-3">
+            <select v-model="reportForm.reason" class="select">
+              <option value="spam">广告 / 灌水</option>
+              <option value="abuse">攻击 / 骚扰</option>
+              <option value="privacy">隐私风险</option>
+              <option value="other">其他</option>
+            </select>
+            <textarea v-model.trim="reportForm.details" class="input h-24 resize-none" placeholder="补充说明（可选）"></textarea>
+            <p v-if="reportError" class="text-sm text-red-600">{{ reportError }}</p>
+            <p v-if="reportMessage" class="text-sm text-teal-700">{{ reportMessage }}</p>
+            <div class="flex justify-end gap-3 pt-2">
+              <button type="button" @click="closeReport" class="btn-secondary">取消</button>
+              <button type="submit" :disabled="reporting" class="btn-primary">{{ reporting ? '提交中...' : '提交举报' }}</button>
             </div>
           </form>
         </div>
@@ -124,13 +148,18 @@ const showEdit = ref(false)
 const savingPost = ref(false)
 const postError = ref('')
 const editPost = ref({ title: '', content: '', department_tag: '', category: '闲聊', is_pinned: false })
+const reportTarget = ref<{ type: string; id: number } | null>(null)
+const reportForm = ref({ reason: 'spam', details: '' })
+const reportError = ref('')
+const reportMessage = ref('')
+const reporting = ref(false)
 
 const rootComments = computed(() => comments.value.filter((c) => !c.parent_id))
 const repliesOf = (id: number) => comments.value.filter((c) => c.parent_id === id)
 
 const CommentBlock = defineComponent({
   props: { comment: { type: Object, required: true } },
-  emits: ['reply', 'remove'],
+  emits: ['reply', 'remove', 'report'],
   setup(props, { emit }) {
     return () => h('div', [
       h('div', { class: 'mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500' }, [
@@ -141,6 +170,9 @@ const CommentBlock = defineComponent({
           : null,
         (props.comment as any).can_delete
           ? h('button', { class: 'text-xs text-red-600 hover:underline', onClick: () => emit('remove', (props.comment as any).id) }, '删除')
+          : null,
+        auth.isLoggedIn && !(props.comment as any).is_deleted && !(props.comment as any).can_delete
+          ? h('button', { class: 'text-xs text-slate-500 hover:underline', onClick: () => emit('report', (props.comment as any).id) }, '举报')
           : null
       ]),
       h(
@@ -232,6 +264,40 @@ async function deleteComment(id: number) {
   if (!window.confirm('确认删除这条评论？')) return
   await api.delete(`/comments/${id}`)
   await refreshPostAndComments()
+}
+
+function openReport(type: string, id: number) {
+  reportTarget.value = { type, id }
+  reportForm.value = { reason: 'spam', details: '' }
+  reportError.value = ''
+  reportMessage.value = ''
+}
+
+function closeReport() {
+  reportTarget.value = null
+  reportError.value = ''
+  reportMessage.value = ''
+}
+
+async function submitReport() {
+  if (!reportTarget.value) return
+  reporting.value = true
+  reportError.value = ''
+  reportMessage.value = ''
+  try {
+    await api.post('/reports', {
+      target_type: reportTarget.value.type,
+      target_id: reportTarget.value.id,
+      reason: reportForm.value.reason,
+      details: reportForm.value.details || null
+    })
+    reportMessage.value = '举报已提交'
+    window.setTimeout(closeReport, 800)
+  } catch (e: any) {
+    reportError.value = e.response?.data?.detail || '提交失败'
+  } finally {
+    reporting.value = false
+  }
 }
 
 function formatTime(iso: string) {

@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
@@ -9,6 +8,16 @@ from app.models.comment import Comment
 from app.models.agent import Agent
 from app.schemas.post import PostCreate, PostOut, PostUpdate, AuthorInfo
 from app.dependencies import get_current_user, get_optional_current_user
+from app.core.moderation import (
+    VISIBILITY_DELETED,
+    VISIBILITY_HIDDEN,
+    VISIBILITY_NORMAL,
+    contains_sensitive_word,
+    create_sensitive_report,
+    enforce_rate_limit,
+    ensure_can_publish,
+    set_post_visibility,
+)
 
 router = APIRouter()
 
@@ -66,6 +75,7 @@ def _post_to_out(
         is_anonymous=post.is_anonymous,
         department_tag=post.department_tag,
         category=post.category,
+        visibility=post.visibility,
         is_pinned=post.is_pinned,
         created_at=post.created_at,
         updated_at=post.updated_at,
@@ -87,7 +97,12 @@ async def list_posts(
     page_size: int = Query(20, ge=1, le=100),
 ):
     offset = (page - 1) * page_size
-    stmt = select(Post).where(Post.is_deleted == False)  # noqa: E712
+    is_admin_view = bool(current_user and current_user.is_admin)
+    stmt = select(Post)
+    if not is_admin_view:
+        stmt = stmt.where(Post.visibility == VISIBILITY_NORMAL, Post.is_deleted == False)  # noqa: E712
+    if not category and not is_admin_view:
+        stmt = stmt.where(Post.category != "公告")
     if department:
         stmt = stmt.where(Post.department_tag == department)
     if category:
@@ -118,7 +133,11 @@ async def list_posts(
     post_ids = [p.id for p in posts]
     counts_result = await db.execute(
         select(Comment.post_id, func.count(Comment.id))
-        .where(Comment.post_id.in_(post_ids), Comment.is_deleted == False)  # noqa: E712
+        .where(
+            Comment.post_id.in_(post_ids),
+            Comment.visibility == VISIBILITY_NORMAL,
+            Comment.is_deleted == False,  # noqa: E712
+        )
         .group_by(Comment.post_id)
     )
     counts = {row[0]: row[1] for row in counts_result.all()}
@@ -147,6 +166,8 @@ async def create_post(
         raise HTTPException(status_code=400, detail="Title is required")
     if not content:
         raise HTTPException(status_code=400, detail="Content is required")
+    ensure_can_publish(current_user)
+    await enforce_rate_limit(db, "user", current_user.id, "post", 60)
 
     post = Post(
         author_id=current_user.id,
@@ -156,7 +177,12 @@ async def create_post(
         department_tag=body.department_tag.strip() if body.department_tag else None,
         category=_normalize_category(body.category, current_user.is_admin),
     )
+    if contains_sensitive_word(title, content):
+        set_post_visibility(post, VISIBILITY_HIDDEN)
     db.add(post)
+    await db.flush()
+    if post.visibility == VISIBILITY_HIDDEN:
+        await create_sensitive_report(db, "post", post.id, "Post matched sensitive words")
     await db.commit()
     await db.refresh(post)
     return _post_to_out(post, current_user, 0)
@@ -168,7 +194,11 @@ async def get_post(
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
 ):
-    result = await db.execute(select(Post).where(Post.id == post_id, Post.is_deleted == False))  # noqa: E712
+    is_admin_view = bool(current_user and current_user.is_admin)
+    stmt = select(Post).where(Post.id == post_id)
+    if not is_admin_view:
+        stmt = stmt.where(Post.visibility == VISIBILITY_NORMAL, Post.is_deleted == False)  # noqa: E712
+    result = await db.execute(stmt)
     post = result.scalar_one_or_none()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -183,7 +213,11 @@ async def get_post(
         agent = agent_result.scalar_one()
 
     count_result = await db.execute(
-        select(func.count(Comment.id)).where(Comment.post_id == post_id, Comment.is_deleted == False)  # noqa: E712
+        select(func.count(Comment.id)).where(
+            Comment.post_id == post_id,
+            Comment.visibility == VISIBILITY_NORMAL,
+            Comment.is_deleted == False,  # noqa: E712
+        )
     )
     count = count_result.scalar_one()
 
@@ -197,7 +231,7 @@ async def update_post(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Post).where(Post.id == post_id, Post.is_deleted == False))  # noqa: E712
+    result = await db.execute(select(Post).where(Post.id == post_id, Post.visibility != VISIBILITY_DELETED))
     post = result.scalar_one_or_none()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
@@ -214,6 +248,8 @@ async def update_post(
         if not content:
             raise HTTPException(status_code=400, detail="Content is required")
         post.content = content
+    if contains_sensitive_word(post.title, post.content):
+        set_post_visibility(post, VISIBILITY_HIDDEN)
     if "department_tag" in body.model_fields_set:
         post.department_tag = body.department_tag.strip() if body.department_tag else None
     if body.category is not None:
@@ -225,6 +261,9 @@ async def update_post(
         if body.is_pinned:
             post.category = "公告"
 
+    await db.flush()
+    if post.visibility == VISIBILITY_HIDDEN:
+        await create_sensitive_report(db, "post", post.id, "Edited post matched sensitive words")
     await db.commit()
     await db.refresh(post)
 
@@ -237,7 +276,11 @@ async def update_post(
         agent_result = await db.execute(select(Agent).where(Agent.id == post.agent_id))
         agent = agent_result.scalar_one()
     count_result = await db.execute(
-        select(func.count(Comment.id)).where(Comment.post_id == post_id, Comment.is_deleted == False)  # noqa: E712
+        select(func.count(Comment.id)).where(
+            Comment.post_id == post_id,
+            Comment.visibility == VISIBILITY_NORMAL,
+            Comment.is_deleted == False,  # noqa: E712
+        )
     )
     return _post_to_out(post, author, count_result.scalar_one(), current_user, agent)
 
@@ -248,12 +291,11 @@ async def delete_post(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    result = await db.execute(select(Post).where(Post.id == post_id, Post.is_deleted == False))  # noqa: E712
+    result = await db.execute(select(Post).where(Post.id == post_id, Post.visibility != VISIBILITY_DELETED))
     post = result.scalar_one_or_none()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     if post.author_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Not allowed")
-    post.is_deleted = True
-    post.deleted_at = datetime.now(timezone.utc)
+    set_post_visibility(post, VISIBILITY_DELETED)
     await db.commit()

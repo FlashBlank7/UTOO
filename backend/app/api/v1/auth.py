@@ -111,6 +111,8 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    if user.is_banned:
+        raise HTTPException(status_code=403, detail="Account is banned")
 
     return TokenResponse(access_token=create_access_token(user.id), refresh_token=create_refresh_token(user.id))
 
@@ -129,6 +131,8 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    if user.is_banned:
+        raise HTTPException(status_code=403, detail="Account is banned")
 
     return TokenResponse(access_token=create_access_token(user.id), refresh_token=create_refresh_token(user.id))
 

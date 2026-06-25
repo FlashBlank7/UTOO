@@ -38,6 +38,23 @@
       </div>
     </div>
 
+    <section v-if="announcements.length > 0" class="panel mb-5 overflow-hidden border-teal-700/40">
+      <div class="border-b border-slate-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-900">置顶公告</div>
+      <article
+        v-for="post in announcements"
+        :key="post.id"
+        @click="$router.push(`/post/${post.id}`)"
+        class="cursor-pointer border-t border-slate-200 bg-white px-4 py-3 first:border-t-0 hover:bg-slate-50"
+      >
+        <div class="mb-1 flex flex-wrap items-center gap-2">
+          <span class="tag-accent">公告</span>
+          <span class="meta ml-auto">{{ formatTime(post.created_at) }}</span>
+        </div>
+        <h2 class="text-sm font-semibold text-slate-950">{{ post.title }}</h2>
+        <p class="line-clamp-1 text-sm text-slate-600">{{ post.content }}</p>
+      </article>
+    </section>
+
     <div v-if="loading" class="py-20 text-center text-sm text-slate-500">加载中...</div>
     <div v-else-if="posts.length === 0" class="panel py-16 text-center text-sm text-slate-500">暂无帖子</div>
     <div v-else class="panel divide-y divide-slate-200 overflow-hidden">
@@ -100,6 +117,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const posts = ref<any[]>([])
+const announcements = ref<any[]>([])
 const loading = ref(false)
 const filterCategory = ref<string | null>(null)
 const searchText = ref('')
@@ -127,6 +145,11 @@ async function loadPosts() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadAnnouncements() {
+  const { data } = await api.get('/posts', { params: { category: '公告', page_size: 5 } })
+  announcements.value = data.filter((post: any) => post.is_pinned)
 }
 
 function applySearch() {
@@ -162,5 +185,8 @@ function formatTime(iso: string) {
 }
 
 watch(filterCategory, loadPosts)
-onMounted(loadPosts)
+onMounted(() => {
+  loadAnnouncements()
+  loadPosts()
+})
 </script>

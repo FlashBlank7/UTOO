@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -8,6 +7,16 @@ from app.models.post import Post
 from app.models.user import User
 from app.schemas.post import CommentCreate, CommentOut, AuthorInfo
 from app.dependencies import get_current_user, get_optional_current_user
+from app.core.moderation import (
+    VISIBILITY_DELETED,
+    VISIBILITY_HIDDEN,
+    VISIBILITY_NORMAL,
+    contains_sensitive_word,
+    create_sensitive_report,
+    enforce_rate_limit,
+    ensure_can_publish,
+    set_comment_visibility,
+)
 
 router = APIRouter()
 
@@ -28,10 +37,24 @@ def _comment_to_out(comment: Comment, author: User, viewer: User | None = None) 
             content="评论已删除",
             is_anonymous=True,
             parent_id=comment.parent_id,
+            visibility=VISIBILITY_DELETED,
             is_deleted=True,
             deleted_at=comment.deleted_at,
             created_at=comment.created_at,
             author=AuthorInfo(display_name="已删除"),
+            can_delete=False,
+        )
+    if comment.visibility == VISIBILITY_HIDDEN and not (viewer and viewer.is_admin):
+        return CommentOut(
+            id=comment.id,
+            content="评论已隐藏",
+            is_anonymous=True,
+            parent_id=comment.parent_id,
+            visibility=VISIBILITY_HIDDEN,
+            is_deleted=False,
+            deleted_at=comment.deleted_at,
+            created_at=comment.created_at,
+            author=AuthorInfo(display_name="已隐藏"),
             can_delete=False,
         )
     return CommentOut(
@@ -39,6 +62,7 @@ def _comment_to_out(comment: Comment, author: User, viewer: User | None = None) 
         content=comment.content,
         is_anonymous=comment.is_anonymous,
         parent_id=comment.parent_id,
+        visibility=comment.visibility,
         is_deleted=False,
         deleted_at=comment.deleted_at,
         created_at=comment.created_at,
@@ -53,7 +77,13 @@ async def list_comments(
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
 ):
-    post_result = await db.execute(select(Post).where(Post.id == post_id, Post.is_deleted == False))  # noqa: E712
+    post_result = await db.execute(
+        select(Post).where(
+            Post.id == post_id,
+            Post.visibility == VISIBILITY_NORMAL,
+            Post.is_deleted == False,  # noqa: E712
+        )
+    )
     if not post_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Post not found")
 
@@ -61,6 +91,8 @@ async def list_comments(
         select(Comment).where(Comment.post_id == post_id).order_by(Comment.created_at.asc())
     )
     comments = result.scalars().all()
+    if not (current_user and current_user.is_admin):
+        comments = [c for c in comments if c.visibility == VISIBILITY_NORMAL and not c.is_deleted]
     if not comments:
         return []
 
@@ -81,7 +113,16 @@ async def create_comment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    post_result = await db.execute(select(Post).where(Post.id == post_id, Post.is_deleted == False))  # noqa: E712
+    ensure_can_publish(current_user)
+    await enforce_rate_limit(db, "user", current_user.id, "comment", 15)
+
+    post_result = await db.execute(
+        select(Post).where(
+            Post.id == post_id,
+            Post.visibility == VISIBILITY_NORMAL,
+            Post.is_deleted == False,  # noqa: E712
+        )
+    )
     if not post_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Post not found")
 
@@ -90,6 +131,7 @@ async def create_comment(
             select(Comment).where(
                 Comment.id == body.parent_id,
                 Comment.post_id == post_id,
+                Comment.visibility == VISIBILITY_NORMAL,
                 Comment.is_deleted == False,  # noqa: E712
             )
         )
@@ -103,7 +145,12 @@ async def create_comment(
         is_anonymous=body.is_anonymous,
         parent_id=body.parent_id,
     )
+    if contains_sensitive_word(body.content):
+        set_comment_visibility(comment, VISIBILITY_HIDDEN)
     db.add(comment)
+    await db.flush()
+    if comment.visibility == VISIBILITY_HIDDEN:
+        await create_sensitive_report(db, "comment", comment.id, "Comment matched sensitive words")
     await db.commit()
     await db.refresh(comment)
 
@@ -120,11 +167,10 @@ async def delete_comment(
     comment = result.scalar_one_or_none()
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
-    if comment.is_deleted:
+    if comment.visibility == VISIBILITY_DELETED or comment.is_deleted:
         return
     if comment.author_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Not allowed")
 
-    comment.is_deleted = True
-    comment.deleted_at = datetime.now(timezone.utc)
+    set_comment_visibility(comment, VISIBILITY_DELETED)
     await db.commit()

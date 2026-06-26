@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">UTOO social preview</title>
+  <desc id="desc">Social preview card for UTOO, an independent UTokyo student community.</desc>
+  <rect width="1200" height="630" fill="#f8fafc"/>
+  <path d="M0 0h1200v630H0z" fill="#f8fafc"/>
+  <path d="M0 0h1200v72H0z" fill="#0f172a"/>
+  <path d="M84 104h1032v410H84z" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <path d="M84 514h1032v34H84z" fill="#0f172a"/>
+  <g transform="translate(842 128)">
+    <path d="M145 0c-32 34-64 48-105 51 23 31 55 50 89 56L96 46c18 9 34 21 49 41 16-20 32-32 50-41l-33 61c34-6 66-25 89-56-41-3-73-17-106-51Z" fill="#FFCD00"/>
+    <path d="M145 5v100" stroke="#0f172a" stroke-width="9" stroke-linecap="round"/>
+    <path d="M88 118 57 66l65 31M202 118l31-52-65 31" fill="#0B8BEE" stroke="#0f172a" stroke-width="9" stroke-linejoin="round"/>
+    <circle cx="145" cy="144" r="76" fill="#ffffff" stroke="#0f172a" stroke-width="10"/>
+    <path d="M100 95 78 48l59 41M190 95l22-47-59 41" fill="#ffffff" stroke="#0f172a" stroke-width="10" stroke-linejoin="round"/>
+    <path d="M111 144h.1M179 144h.1" stroke="#0f172a" stroke-width="17" stroke-linecap="round"/>
+    <path d="M136 162h18l-9 12Z" fill="#0f172a"/>
+    <path d="M121 184c16 12 32 12 48 0" fill="none" stroke="#0B8BEE" stroke-width="8" stroke-linecap="round"/>
+    <path d="M207 101c12-20 26-26 45-31" stroke="#ef4444" stroke-width="10" stroke-linecap="round"/>
+  </g>
+  <text x="128" y="178" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="82" font-weight="800" letter-spacing="0">UTOO</text>
+  <text x="128" y="232" fill="#0B8BEE" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="700" letter-spacing="0">UTokyo student community</text>
+  <text x="128" y="306" fill="#334155" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="600" letter-spacing="0">课程 · 研究室 · 生活 · 租房 · 就职</text>
+  <text x="128" y="362" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="25" letter-spacing="0">An independent forum for student knowledge, campus life, and practical discussion.</text>
+  <g transform="translate(128 416)" font-family="Inter, Arial, sans-serif" font-size="23" font-weight="700">
+    <rect width="96" height="42" rx="4" fill="#0f172a"/>
+    <text x="24" y="28" fill="#ffffff">课程</text>
+    <rect x="112" width="120" height="42" rx="4" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="136" y="28" fill="#334155">研究室</text>
+    <rect x="248" width="96" height="42" rx="4" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="272" y="28" fill="#334155">生活</text>
+    <rect x="360" width="96" height="42" rx="4" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="384" y="28" fill="#334155">租房</text>
+    <rect x="472" width="96" height="42" rx="4" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="496" y="28" fill="#334155">就职</text>
+  </g>
+  <text x="128" y="538" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="18" letter-spacing="0">Independent student community. Not an official University of Tokyo service.</text>
+</svg>

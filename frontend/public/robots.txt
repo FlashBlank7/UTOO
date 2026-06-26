@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Allow: /assets/
+Allow: /favicon.svg
+Allow: /favicon-32x32.png
+Allow: /apple-touch-icon.png
+Allow: /og-image.png
+Disallow: /api/
+Disallow: /admin
+Disallow: /account
+Disallow: /post/
+
+Sitemap: https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net/sitemap.xml

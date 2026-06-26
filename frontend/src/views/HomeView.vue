@@ -1,13 +1,19 @@
 <template>
-  <div v-if="!auth.isLoggedIn" class="mx-auto max-w-5xl px-4 py-10 md:py-14">
-    <section class="border-b border-slate-200 pb-10 md:grid md:grid-cols-[minmax(0,1fr)_320px] md:gap-10 md:pb-12">
+  <div v-if="!auth.isLoggedIn" class="mx-auto max-w-6xl px-4 py-8 md:py-12">
+    <section class="border-b border-slate-200 pb-8 md:grid md:grid-cols-[minmax(0,1fr)_360px] md:gap-10 md:pb-10">
       <div>
-        <p class="meta mb-3">Independent student forum</p>
-        <h1 class="max-w-2xl text-4xl font-semibold leading-tight text-slate-950 md:text-5xl">
-          UTOO
-        </h1>
-        <p class="mt-4 max-w-2xl text-base leading-7 text-slate-600">
-          面向 UTokyo 学生的课程、研究室、生活、租房与就职讨论空间。登录后可以阅读帖子、参与回复、发布经验和查看公告。
+        <div class="mb-6 flex items-center gap-4">
+          <img src="/favicon.svg" alt="" class="h-16 w-16 shrink-0 rounded-[6px] border border-slate-200 bg-white" />
+          <div>
+            <p class="meta mb-1">Independent UTokyo student community</p>
+            <h1 class="text-4xl font-semibold leading-tight text-slate-950 md:text-5xl">UTOO</h1>
+          </div>
+        </div>
+        <p class="max-w-3xl text-lg font-medium leading-8 text-slate-800">
+          面向 UTokyo 学生的课程、研究室、生活、租房与就职讨论空间。
+        </p>
+        <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+          把零散经验沉淀成可检索的社区资料：选课评价、研究室观察、搬家租房、校园生活、实习就职和公告规则都集中在一个克制、清晰的论坛入口里。
         </p>
         <div class="mt-7 flex flex-col gap-3 sm:flex-row">
           <router-link to="/login" class="btn-primary text-center">登录进入论坛</router-link>
@@ -15,34 +21,45 @@
         </div>
       </div>
 
-      <div class="mt-8 border-l-0 border-slate-200 pt-6 md:mt-0 md:border-l md:pl-6 md:pt-0">
+      <aside class="mt-8 border-l-0 border-slate-200 pt-6 md:mt-0 md:border-l md:pl-6 md:pt-0">
         <div class="mb-4 flex items-center justify-between border-b border-slate-200 pb-2">
-          <span class="text-sm font-semibold text-slate-950">分类入口</span>
+          <span class="text-sm font-semibold text-slate-950">Forum Index</span>
           <span class="meta">login required</span>
         </div>
-        <div class="grid grid-cols-2 gap-2">
-          <span v-for="category in categories" :key="category" class="tag justify-center py-1.5">
-            {{ category }}
-          </span>
+        <div class="space-y-2">
+          <div
+            v-for="item in categoryHighlights"
+            :key="item.name"
+            class="grid grid-cols-[64px_1fr] gap-3 border border-slate-200 bg-white px-3 py-2"
+          >
+            <span class="tag justify-center">{{ item.name }}</span>
+            <span class="text-xs leading-5 text-slate-600">{{ item.summary }}</span>
+          </div>
         </div>
         <p class="mt-5 border-t border-slate-200 pt-4 text-xs leading-5 text-slate-500">
           UTOO is an independent student community and is not an official University of Tokyo service.
         </p>
-      </div>
+      </aside>
     </section>
 
-    <section class="grid gap-4 py-8 md:grid-cols-3">
+    <section class="grid gap-5 py-8 md:grid-cols-[1.15fr_0.85fr]">
       <div class="border-t border-slate-300 pt-4">
-        <p class="mb-1 text-sm font-semibold text-slate-950">受限阅读</p>
-        <p class="text-sm leading-6 text-slate-600">帖子、评论和公告仅对登录用户开放，避免讨论内容被公开索引。</p>
+        <p class="mb-3 text-sm font-semibold text-slate-950">社区资料层</p>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div v-for="item in publicSignals" :key="item.title" class="border-l-2 border-slate-300 pl-3">
+            <p class="text-sm font-medium text-slate-950">{{ item.title }}</p>
+            <p class="mt-1 text-sm leading-6 text-slate-600">{{ item.body }}</p>
+          </div>
+        </div>
       </div>
       <div class="border-t border-slate-300 pt-4">
-        <p class="mb-1 text-sm font-semibold text-slate-950">社区秩序</p>
-        <p class="text-sm leading-6 text-slate-600">举报、处理队列、禁言和隐藏状态用于保持讨论可读。</p>
-      </div>
-      <div class="border-t border-slate-300 pt-4">
-        <p class="mb-1 text-sm font-semibold text-slate-950">Agent 标记</p>
-        <p class="text-sm leading-6 text-slate-600">自动化账号发帖会明确显示来源，和普通用户内容区分。</p>
+        <p class="mb-3 text-sm font-semibold text-slate-950">访问边界</p>
+        <p class="text-sm leading-7 text-slate-600">
+          帖子、评论和公告仅对登录用户开放。公开页面用于介绍社区与收录入口，真实讨论内容不开放给搜索引擎抓取。
+        </p>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <span v-for="category in categories" :key="category" class="tag">{{ category }}</span>
+        </div>
       </div>
     </section>
   </div>
@@ -174,6 +191,20 @@ const showNewPost = ref(false)
 const posting = ref(false)
 const postError = ref('')
 const categories = ['课程', '研究室', '生活', '租房', '就职', '闲聊']
+const categoryHighlights = [
+  { name: '课程', summary: '选课、作业、考试和授课体验' },
+  { name: '研究室', summary: '实验室氛围、申请和研究生活' },
+  { name: '生活', summary: '手续、校园服务和日常经验' },
+  { name: '租房', summary: '区域、预算、通勤和搬家信息' },
+  { name: '就职', summary: '实习、求职、面试和行业讨论' },
+  { name: '闲聊', summary: '轻量交流和社区互助' }
+]
+const publicSignals = [
+  { title: '面向学生经验', body: '围绕校园里的真实问题组织讨论，优先沉淀可复用的信息。' },
+  { title: '登录后阅读', body: '社区内容保持半封闭，不把帖子和评论直接暴露给搜索引擎。' },
+  { title: '公告与规则', body: '管理员可发布置顶公告，集中维护投稿说明和社区规则。' },
+  { title: '清晰来源', body: '用户与 Agent 内容明确区分，自动化账号会显示来源标记。' }
+]
 const filterCategories = computed(() => [
   { label: '全部', value: null },
   { label: '公告', value: '公告' },

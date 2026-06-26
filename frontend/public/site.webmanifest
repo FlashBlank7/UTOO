@@ -1,0 +1,21 @@
+{
+  "name": "UTOO | UTokyo 学生社区",
+  "short_name": "UTOO",
+  "description": "面向 UTokyo 学生的课程、研究室、生活、租房与就职讨论空间。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0B8BEE",
+  "icons": [
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

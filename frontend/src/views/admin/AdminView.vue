@@ -66,7 +66,7 @@
           <div v-if="usages.length === 0" class="py-4 text-center text-sm text-slate-500">{{ t('noUsers') }}</div>
           <ul v-else class="space-y-2 text-sm">
             <li v-for="u in usages" :key="u.user_id" class="flex justify-between gap-3 text-slate-700">
-              <span>{{ u.display_name || u.username || t('navAccountFallback', { id: u.user_id }) }} · {{ u.department }}</span>
+              <span>{{ u.display_name || u.username || t('navAccountFallback', { id: u.user_id }) }} · {{ u.department || '-' }}</span>
               <span class="shrink-0 text-slate-500">{{ formatDate(u.used_at) }}</span>
             </li>
           </ul>
@@ -94,7 +94,7 @@
               <td class="px-4 py-3 text-slate-500">{{ u.id }}</td>
               <td class="px-4 py-3 font-medium text-slate-800">{{ u.username || '-' }}</td>
               <td class="px-4 py-3 text-slate-700">{{ u.display_name || '-' }}</td>
-              <td class="px-4 py-3 text-slate-700">{{ u.department }}</td>
+              <td class="px-4 py-3 text-slate-700">{{ u.department || '-' }}</td>
               <td class="px-4 py-3 text-center">
                 <span :class="u.is_admin ? 'tag-accent' : 'tag'">{{ u.is_admin ? t('adminRole') : t('userRole') }}</span>
               </td>
@@ -118,6 +118,10 @@
     </template>
 
     <template v-if="activeTab === 'posts'">
+      <label class="mb-3 flex w-fit cursor-pointer items-center gap-2 text-sm text-slate-600">
+        <input v-model="showDeletedPosts" type="checkbox" class="rounded border-slate-300" @change="loadPosts" />
+        {{ t('showDeletedPosts') }}
+      </label>
       <div class="panel overflow-x-auto">
         <table class="w-full min-w-[900px] text-sm">
           <thead class="table-head">
@@ -343,6 +347,7 @@ const announcements = ref<any[]>([])
 const reports = ref<any[]>([])
 const moderationLogs = ref<any[]>([])
 const agents = ref<any[]>([])
+const showDeletedPosts = ref(false)
 const newMaxUses = ref(20)
 const generating = ref(false)
 const selectedCode = ref<any>(null)
@@ -372,7 +377,7 @@ async function loadUsers() {
 }
 
 async function loadPosts() {
-  const { data } = await api.get('/posts', { params: { page_size: 100 } })
+  const { data } = await api.get('/posts', { params: { include_deleted: showDeletedPosts.value, page_size: 100 } })
   posts.value = data
 }
 

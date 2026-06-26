@@ -116,7 +116,7 @@
           <span class="meta ml-auto">{{ formatDate(post.created_at) }}</span>
         </div>
         <h2 class="text-sm font-semibold text-slate-950">{{ post.title }}</h2>
-        <p class="line-clamp-1 text-sm text-slate-600">{{ post.content }}</p>
+        <p class="line-clamp-1 text-sm text-slate-600">{{ stickerPlainText(post.content) }}</p>
       </article>
     </section>
 
@@ -136,7 +136,7 @@
           <span class="meta ml-auto">{{ formatDate(post.created_at) }}</span>
         </div>
         <h2 class="mb-1 text-base font-semibold leading-snug text-slate-950">{{ post.title }}</h2>
-        <p class="line-clamp-2 text-sm leading-6 text-slate-600">{{ post.content }}</p>
+        <p class="line-clamp-2 text-sm leading-6 text-slate-600">{{ stickerPlainText(post.content) }}</p>
         <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
           <span class="inline-flex items-center gap-2">
             <span>{{ post.author.display_name }}</span>
@@ -158,7 +158,21 @@
           <select v-model="newPost.category" class="select">
             <option v-for="category in writableCategories" :key="category" :value="category">{{ categoryLabel(category) }}</option>
           </select>
-          <textarea v-model.trim="newPost.content" required class="input h-36 resize-none" :placeholder="t('contentPlaceholder')"></textarea>
+          <textarea
+            ref="newPostContentInput"
+            v-model.trim="newPost.content"
+            required
+            class="input h-36 resize-none"
+            :placeholder="t('contentPlaceholder')"
+            @click="rememberNewPostCursor"
+            @input="rememberNewPostCursor"
+            @keyup="rememberNewPostCursor"
+            @select="rememberNewPostCursor"
+          ></textarea>
+          <div class="flex items-center justify-between gap-3">
+            <StickerPicker @select="insertNewPostSticker" />
+            <span class="text-xs text-slate-500">{{ t('stickerInsertHint') }}</span>
+          </div>
           <input v-model.trim="newPost.department_tag" class="input" :placeholder="t('departmentTagPlaceholder')" />
           <label class="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
             <input type="checkbox" v-model="newPost.is_anonymous" class="rounded border-slate-300" />
@@ -180,6 +194,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from '@/i18n'
+import StickerPicker from '@/components/StickerPicker.vue'
+import { stickerPlainText } from '@/stickers/yutoko'
 
 const auth = useAuthStore()
 const { t, categoryLabel, sourceLabel, formatDate } = useI18n()
@@ -192,6 +208,8 @@ const appliedSearch = ref('')
 const showNewPost = ref(false)
 const posting = ref(false)
 const postError = ref('')
+const newPostContentInput = ref<HTMLTextAreaElement | null>(null)
+const newPostContentCursor = ref({ start: 0, end: 0 })
 const categories = ['课程', '研究室', '生活', '租房', '就职', '闲聊']
 const categoryHighlights = [
   { name: '课程', summaryKey: 'categoryCourseSummary' },
@@ -214,6 +232,37 @@ const filterCategories = computed(() => [
 ])
 const writableCategories = computed(() => auth.isAdmin ? ['公告', ...categories] : categories)
 const newPost = ref({ title: '', content: '', department_tag: '', category: '闲聊', is_anonymous: false })
+
+function rememberNewPostCursor() {
+  const target = newPostContentInput.value
+  if (!target) return
+  newPostContentCursor.value = {
+    start: target.selectionStart ?? newPost.value.content.length,
+    end: target.selectionEnd ?? newPost.value.content.length
+  }
+}
+
+function insertAtCursor(target: HTMLTextAreaElement | null, current: string, token: string, cursor: { start: number; end: number }) {
+  const insert = current && !/[\s\n]$/.test(current) ? ` ${token} ` : `${token} `
+  const start = Math.min(cursor.start, current.length)
+  const end = Math.min(cursor.end, current.length)
+  if (!target) return `${current.slice(0, start)}${insert}${current.slice(end)}`
+
+  const next = `${current.slice(0, start)}${insert}${current.slice(end)}`
+  requestAnimationFrame(() => {
+    target.focus()
+    const position = start + insert.length
+    target.setSelectionRange(position, position)
+    cursor.start = position
+    cursor.end = position
+  })
+  return next
+}
+
+function insertNewPostSticker(code: string) {
+  rememberNewPostCursor()
+  newPost.value.content = insertAtCursor(newPostContentInput.value, newPost.value.content, code, newPostContentCursor.value)
+}
 
 async function loadPosts() {
   if (!auth.isLoggedIn) return
@@ -259,10 +308,15 @@ async function submitPost() {
     await loadPosts()
     notifyMascot('post-created')
   } catch (e: any) {
-    postError.value = e.response?.data?.detail || t('postFailed')
+    postError.value = apiErrorMessage(e, t('postFailed'))
   } finally {
     posting.value = false
   }
+}
+
+function apiErrorMessage(e: any, fallback: string) {
+  if (e.response?.status === 429) return t('rateLimited')
+  return e.response?.data?.detail || fallback
 }
 
 function notifyMascot(context: string) {

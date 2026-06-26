@@ -14,8 +14,8 @@
         <input v-model.trim="form.username" required class="input" :placeholder="t('usernamePlaceholder')" />
       </div>
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('department') }} <span class="text-red-600">*</span></label>
-        <input v-model.trim="form.department" required class="input" :placeholder="t('departmentPlaceholder')" />
+        <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('departmentOptional') }}</label>
+        <input v-model.trim="form.department" class="input" :placeholder="t('departmentPlaceholder')" />
       </div>
       <div>
         <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('password') }} <span class="text-red-600">*</span></label>
@@ -74,10 +74,10 @@ async function submit() {
   try {
     const payload: Record<string, string> = {
       activation_code: form.value.activation_code,
-      department: form.value.department,
       password: form.value.password,
       username: form.value.username,
     }
+    if (form.value.department) payload.department = form.value.department
     if (form.value.display_name) payload.display_name = form.value.display_name
     if (form.value.email) payload.email = form.value.email
 
@@ -99,7 +99,6 @@ function registerErrorMessage(e: any) {
   if (detail === 'Username already taken') return t('usernameTaken')
   if (detail === 'Email already registered') return t('emailTaken')
   if (detail === 'Username is required') return t('usernameRequired')
-  if (detail === 'Department is required') return t('departmentRequired')
   if (typeof detail === 'string') return detail
   if (e.request && !e.response) return t('networkError')
   return t('registerFailed')

@@ -94,12 +94,17 @@ async def list_posts(
     department: str | None = Query(None),
     category: str | None = Query(None),
     q: str | None = Query(None),
+    include_deleted: bool = Query(False),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
     offset = (page - 1) * page_size
     is_admin_view = bool(current_user and current_user.is_admin)
     stmt = select(Post)
+    if include_deleted and not is_admin_view:
+        raise HTTPException(status_code=403, detail="Admin only")
+    if not include_deleted:
+        stmt = stmt.where(Post.visibility != VISIBILITY_DELETED, Post.is_deleted == False)  # noqa: E712
     if not is_admin_view:
         stmt = stmt.where(Post.visibility == VISIBILITY_NORMAL, Post.is_deleted == False)  # noqa: E712
     if not category and not is_admin_view:
@@ -197,7 +202,11 @@ async def get_post(
     current_user: User = Depends(get_current_user),
 ):
     is_admin_view = bool(current_user and current_user.is_admin)
-    stmt = select(Post).where(Post.id == post_id)
+    stmt = select(Post).where(
+        Post.id == post_id,
+        Post.visibility != VISIBILITY_DELETED,
+        Post.is_deleted == False,  # noqa: E712
+    )
     if not is_admin_view:
         stmt = stmt.where(Post.visibility == VISIBILITY_NORMAL, Post.is_deleted == False)  # noqa: E712
     result = await db.execute(stmt)

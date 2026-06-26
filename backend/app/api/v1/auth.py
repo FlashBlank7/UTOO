@@ -20,12 +20,10 @@ ADMIN_BOOTSTRAP_CODE = "UTOO-ADMIN"
 async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     username = body.username.strip()
     display_name = body.display_name.strip() if body.display_name else None
-    department = body.department.strip()
+    department = body.department.strip() if body.department else None
 
     if not username:
         raise HTTPException(status_code=400, detail="Username is required")
-    if not department:
-        raise HTTPException(status_code=400, detail="Department is required")
 
     is_admin = False
     if body.activation_code == ADMIN_BOOTSTRAP_CODE:
@@ -152,11 +150,8 @@ async def update_me(
         display_name = body.display_name.strip() if body.display_name else None
         current_user.display_name = display_name or None
 
-    if body.department is not None:
-        department = body.department.strip()
-        if not department:
-            raise HTTPException(status_code=400, detail="Department is required")
-        current_user.department = department
+    if "department" in body.model_fields_set:
+        current_user.department = body.department.strip() or None
 
     if "email" in body.model_fields_set:
         email = str(body.email) if body.email else None

@@ -6,7 +6,7 @@ class UserOut(BaseModel):
     id: int
     username: str | None
     display_name: str | None = None
-    department: str
+    department: str | None = None
     email: EmailStr | None = None
     is_admin: bool
     is_banned: bool = False
@@ -25,7 +25,7 @@ class TokenResponse(BaseModel):
 class RegisterRequest(BaseModel):
     activation_code: str
     password: str
-    department: str
+    department: str | None = None
     username: str
     display_name: str | None = None
     email: EmailStr | None = None

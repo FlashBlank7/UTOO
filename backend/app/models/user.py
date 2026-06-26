@@ -11,7 +11,7 @@ class User(Base):
     username: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(50), nullable=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
-    department: Mapped[str] = mapped_column(String(100), nullable=False)
+    department: Mapped[str | None] = mapped_column(String(100), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

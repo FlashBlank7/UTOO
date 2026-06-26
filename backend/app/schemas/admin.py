@@ -17,7 +17,7 @@ class CodeUsageOut(BaseModel):
     user_id: int
     username: str | None
     display_name: str | None = None
-    department: str
+    department: str | None = None
     used_at: datetime
 
     model_config = {"from_attributes": True}

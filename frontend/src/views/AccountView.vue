@@ -15,8 +15,8 @@
         <input v-model.trim="profile.display_name" class="input" :placeholder="t('displayNamePlaceholder')" />
       </div>
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('department') }}</label>
-        <input v-model.trim="profile.department" required class="input" />
+        <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('departmentOptional') }}</label>
+        <input v-model.trim="profile.department" class="input" :placeholder="t('departmentPlaceholder')" />
       </div>
       <div>
         <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('email') }}</label>
@@ -85,7 +85,7 @@ async function saveProfile() {
   try {
     await api.patch('/auth/me', {
       display_name: profile.value.display_name || null,
-      department: profile.value.department,
+      department: profile.value.department || null,
       email: profile.value.email || null
     })
     await auth.fetchMe()

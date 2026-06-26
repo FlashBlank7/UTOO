@@ -7,7 +7,7 @@ interface User {
   id: number
   username: string | null
   display_name: string | null
-  department: string
+  department: string | null
   email: string | null
   is_admin: boolean
 }

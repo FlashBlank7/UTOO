@@ -25,7 +25,9 @@
           </div>
           <button v-else-if="auth.isLoggedIn" @click="openReport('post', post.id)" class="btn-secondary shrink-0">{{ t('report') }}</button>
         </div>
-        <p class="whitespace-pre-wrap text-sm leading-7 text-slate-700">{{ post.content }}</p>
+        <p class="text-sm leading-7 text-slate-700">
+          <StickerText :text="post.content" />
+        </p>
       </article>
 
       <div class="mb-3 flex items-center justify-between">
@@ -34,11 +36,17 @@
 
       <div v-if="auth.isLoggedIn" class="panel mb-4 bg-white p-4">
         <textarea
+          ref="commentInput"
           v-model="commentText"
           class="input mb-2 h-24 resize-none"
           :placeholder="replyTo ? t('replyTo', { id: replyTo }) : t('writeReply')"
+          @click="rememberCommentCursor"
+          @input="rememberCommentCursor"
+          @keyup="rememberCommentCursor"
+          @select="rememberCommentCursor"
         ></textarea>
         <div class="flex flex-wrap items-center gap-3">
+          <StickerPicker @select="insertCommentSticker" />
           <label class="flex cursor-pointer items-center gap-1.5 text-sm text-slate-600">
             <input type="checkbox" v-model="commentAnon" class="rounded border-slate-300" /> {{ t('anonymous') }}
           </label>
@@ -82,7 +90,21 @@
             <select v-model="editPost.category" class="select">
               <option v-for="category in writableCategories" :key="category" :value="category">{{ categoryLabel(category) }}</option>
             </select>
-            <textarea v-model.trim="editPost.content" required class="input h-36 resize-none" :placeholder="t('contentPlaceholder')"></textarea>
+            <textarea
+              ref="editPostContentInput"
+              v-model.trim="editPost.content"
+              required
+              class="input h-36 resize-none"
+              :placeholder="t('contentPlaceholder')"
+              @click="rememberEditPostCursor"
+              @input="rememberEditPostCursor"
+              @keyup="rememberEditPostCursor"
+              @select="rememberEditPostCursor"
+            ></textarea>
+            <div class="flex items-center justify-between gap-3">
+              <StickerPicker @select="insertEditPostSticker" />
+              <span class="text-xs text-slate-500">{{ t('stickerInsertHint') }}</span>
+            </div>
             <input v-model.trim="editPost.department_tag" class="input" :placeholder="t('departmentTagPlaceholder')" />
             <label v-if="auth.isAdmin" class="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
               <input type="checkbox" v-model="editPost.is_pinned" class="rounded border-slate-300" />
@@ -129,6 +151,8 @@ import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from '@/i18n'
+import StickerPicker from '@/components/StickerPicker.vue'
+import StickerText from '@/components/StickerText.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -155,6 +179,10 @@ const reportForm = ref({ reason: 'spam', details: '' })
 const reportError = ref('')
 const reportMessage = ref('')
 const reporting = ref(false)
+const commentInput = ref<HTMLTextAreaElement | null>(null)
+const editPostContentInput = ref<HTMLTextAreaElement | null>(null)
+const commentCursor = ref({ start: 0, end: 0 })
+const editPostContentCursor = ref({ start: 0, end: 0 })
 
 const rootComments = computed(() => comments.value.filter((c) => !c.parent_id))
 const repliesOf = (id: number) => comments.value.filter((c) => c.parent_id === id)
@@ -185,12 +213,52 @@ const CommentBlock = defineComponent({
       ]),
       h(
         'p',
-        { class: [(props.comment as any).is_deleted ? 'text-slate-400 italic' : 'text-slate-700', 'whitespace-pre-wrap text-sm leading-6'] },
-        (props.comment as any).content
+        { class: [(props.comment as any).is_deleted ? 'text-slate-400 italic' : 'text-slate-700', 'text-sm leading-6'] },
+        h(StickerText, { text: (props.comment as any).content, size: 'small' })
       )
     ])
   }
 })
+
+function rememberCursor(target: HTMLTextAreaElement | null, fallbackLength: number) {
+  return {
+    start: target?.selectionStart ?? fallbackLength,
+    end: target?.selectionEnd ?? fallbackLength
+  }
+}
+
+function rememberCommentCursor() {
+  commentCursor.value = rememberCursor(commentInput.value, commentText.value.length)
+}
+
+function rememberEditPostCursor() {
+  editPostContentCursor.value = rememberCursor(editPostContentInput.value, editPost.value.content.length)
+}
+
+function insertAtCursor(target: HTMLTextAreaElement | null, current: string, token: string, cursor: { start: number; end: number }) {
+  const insert = current && !/[\s\n]$/.test(current) ? ` ${token} ` : `${token} `
+  const start = Math.min(cursor.start, current.length)
+  const end = Math.min(cursor.end, current.length)
+  if (!target) return `${current.slice(0, start)}${insert}${current.slice(end)}`
+
+  const next = `${current.slice(0, start)}${insert}${current.slice(end)}`
+  requestAnimationFrame(() => {
+    target.focus()
+    const position = start + insert.length
+    target.setSelectionRange(position, position)
+    cursor.start = position
+    cursor.end = position
+  })
+  return next
+}
+
+function insertCommentSticker(code: string) {
+  commentText.value = insertAtCursor(commentInput.value, commentText.value, code, commentCursor.value)
+}
+
+function insertEditPostSticker(code: string) {
+  editPost.value.content = insertAtCursor(editPostContentInput.value, editPost.value.content, code, editPostContentCursor.value)
+}
 
 async function load() {
   loading.value = true
@@ -237,7 +305,7 @@ async function savePost() {
     post.value = data
     showEdit.value = false
   } catch (e: any) {
-    postError.value = e.response?.data?.detail || t('saveFailed')
+    postError.value = apiErrorMessage(e, t('saveFailed'))
   } finally {
     savingPost.value = false
   }
@@ -263,7 +331,7 @@ async function submitComment() {
     await refreshPostAndComments()
     notifyMascot('comment-created')
   } catch (e: any) {
-    commentError.value = e.response?.data?.detail || t('submitFailed')
+    commentError.value = apiErrorMessage(e, t('submitFailed'))
   } finally {
     submitting.value = false
   }
@@ -304,10 +372,15 @@ async function submitReport() {
     notifyMascot('report-sent')
     window.setTimeout(closeReport, 800)
   } catch (e: any) {
-    reportError.value = e.response?.data?.detail || t('submitFailed')
+    reportError.value = apiErrorMessage(e, t('submitFailed'))
   } finally {
     reporting.value = false
   }
+}
+
+function apiErrorMessage(e: any, fallback: string) {
+  if (e.response?.status === 429) return t('rateLimited')
+  return e.response?.data?.detail || fallback
 }
 
 function notifyMascot(context: string) {

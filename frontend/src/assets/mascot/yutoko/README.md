@@ -1,9 +1,13 @@
-# Yutoko Mascot Iteration Archive
+# Yutoko / 優都子 Mascot Iteration Archive
 
-Yutoko is the original UTOO mascot. This folder keeps local iteration artifacts so future visual changes do not live only in generated build output.
+Yutoko / 優都子 / ゆとこ is the original UTOO mascot. This folder keeps local iteration artifacts so future visual changes do not live only in generated build output.
 
 - `exports/` contains the current transparent PNG exports.
 - `prompts/` contains the design prompt and safety/brand notes.
+- `prompts/yutoko-stickers-v1.md` records the first forum sticker pack.
+- `exports/favicon-head-source.png` keeps the generated source used for the current Yutoko favicon.
+
+The public sticker PNGs are served from `frontend/public/stickers/yutoko/`, not from this archive folder. Forum posts and comments store sticker shortcodes such as `:yutoko_thanks:` and render only the whitelisted Yutoko manifest.
 
 Brand boundary:
 

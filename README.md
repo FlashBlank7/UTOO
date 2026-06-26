@@ -125,6 +125,17 @@ http://localhost:8010
 
 如果本机 `5432` 已被其他 PostgreSQL 占用，可以把 `docker-compose.yml` 里的数据库端口左侧改成其他端口，例如 `15432:5432`，并在本地开发后端时同步调整 `DATABASE_URL`。
 
+## Yutoko / 優都子 形象与表情包素材
+
+`Yutoko / 優都子 / ゆとこ` 是 UTOO 的原创看板娘。当前形象迭代和表情包素材保存在仓库里，方便之后继续改造：
+
+- 七日换装透明 PNG：`frontend/src/assets/mascot/yutoko/exports/`
+- 当前形象提示词与设计 notes：`frontend/src/assets/mascot/yutoko/prompts/yutoko-v2.md`
+- 论坛内公开表情包：`frontend/public/stickers/yutoko/`
+- 表情包 v1 提示词与制作 notes：`frontend/src/assets/mascot/yutoko/prompts/yutoko-stickers-v1.md`
+
+表情包在帖子和评论正文里使用短代码保存，例如 `:yutoko_thanks:`、`:yutoko_cheer:`、`:yutoko_yubikubi:`。前端只渲染白名单 manifest 中定义的 Yutoko 短代码，不支持任意图片 URL 或 HTML。
+
 ## Azure App Service 免费版部署
 
 本项目支持部署到单个 Azure App Service Python 应用：

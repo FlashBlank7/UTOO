@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title desc">
+  <title id="title">UTOO favicon</title>
+  <desc id="desc">Original ginkgo and Yutoko cat mascot face mark for UTOO.</desc>
+  <rect width="128" height="128" rx="22" fill="#f8fafc"/>
+  <path d="M64 12c-14 15-29 21-47 22 10 14 24 22 39 25L42 32c8 4 15 10 22 18 7-8 14-14 22-18L72 59c15-3 29-11 39-25-18-1-33-7-47-22Z" fill="#FFCD00"/>
+  <path d="M64 15v44" stroke="#0f172a" stroke-width="4" stroke-linecap="round"/>
+  <path d="M39 65 25 42l29 13M89 65l14-23-29 13" fill="#0B8BEE" stroke="#0f172a" stroke-width="4" stroke-linejoin="round"/>
+  <circle cx="64" cy="77" r="35" fill="#ffffff" stroke="#0f172a" stroke-width="5"/>
+  <path d="M44 55 34 33l26 18M84 55l10-22-26 18" fill="#ffffff" stroke="#0f172a" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M49 76h.1M79 76h.1" stroke="#0f172a" stroke-width="8" stroke-linecap="round"/>
+  <path d="M60 84h8l-4 5Z" fill="#0f172a"/>
+  <path d="M53 94c7 6 15 6 22 0" fill="none" stroke="#0B8BEE" stroke-width="4" stroke-linecap="round"/>
+  <path d="M34 82c-6-3-12-3-19 0M35 91c-7 0-13 2-19 6M94 82c6-3 12-3 19 0M93 91c7 0 13 2 19 6" stroke="#64748b" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="91" cy="57" r="8" fill="#ef4444"/>
+</svg>

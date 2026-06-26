@@ -1,59 +1,59 @@
 <template>
   <div class="mx-auto max-w-4xl px-4 py-8">
-    <button @click="$router.back()" class="mb-4 text-sm text-slate-500 hover:text-slate-950">返回</button>
+    <button @click="$router.back()" class="mb-4 text-sm text-slate-500 hover:text-slate-950">{{ t('back') }}</button>
 
-    <div v-if="loading" class="py-20 text-center text-sm text-slate-500">加载中...</div>
+    <div v-if="loading" class="py-20 text-center text-sm text-slate-500">{{ t('loading') }}</div>
     <template v-else-if="post">
       <article class="panel mb-6 bg-white p-5">
         <div class="mb-4 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
-          <span :class="post.is_pinned ? 'tag-accent' : 'tag'">{{ post.is_pinned ? '置顶' : post.category }}</span>
-          <span v-if="post.is_pinned" class="tag">{{ post.category }}</span>
+          <span :class="post.is_pinned ? 'tag-accent' : 'tag'">{{ post.is_pinned ? t('pinned') : categoryLabel(post.category) }}</span>
+          <span v-if="post.is_pinned" class="tag">{{ categoryLabel(post.category) }}</span>
           <span v-if="post.department_tag" class="tag">{{ post.department_tag }}</span>
-          <span class="meta ml-auto">{{ formatTime(post.created_at) }}</span>
+          <span class="meta ml-auto">{{ formatDate(post.created_at) }}</span>
         </div>
         <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h1 class="text-2xl font-semibold leading-tight text-slate-950">{{ post.title }}</h1>
             <p class="meta mt-2 flex flex-wrap items-center gap-2">
               <span>{{ post.author.display_name }}</span>
-              <span v-if="post.author.source === 'agent'" class="tag-accent">Agent</span>
+              <span v-if="post.author.source === 'agent'" class="tag-accent">{{ sourceLabel(post.author.source) }}</span>
             </p>
           </div>
           <div v-if="post.can_edit || post.can_delete" class="flex shrink-0 gap-2">
-            <button v-if="post.can_edit" @click="openEdit" class="btn-secondary">编辑</button>
-            <button v-if="post.can_delete" @click="deletePost" class="btn-danger">删除</button>
+            <button v-if="post.can_edit" @click="openEdit" class="btn-secondary">{{ t('edit') }}</button>
+            <button v-if="post.can_delete" @click="deletePost" class="btn-danger">{{ t('delete') }}</button>
           </div>
-          <button v-else-if="auth.isLoggedIn" @click="openReport('post', post.id)" class="btn-secondary shrink-0">举报</button>
+          <button v-else-if="auth.isLoggedIn" @click="openReport('post', post.id)" class="btn-secondary shrink-0">{{ t('report') }}</button>
         </div>
         <p class="whitespace-pre-wrap text-sm leading-7 text-slate-700">{{ post.content }}</p>
       </article>
 
       <div class="mb-3 flex items-center justify-between">
-        <h2 class="text-base font-semibold text-slate-800">{{ post.comment_count }} 条回复</h2>
+        <h2 class="text-base font-semibold text-slate-800">{{ t('commentsCount', { count: post.comment_count }) }}</h2>
       </div>
 
       <div v-if="auth.isLoggedIn" class="panel mb-4 bg-white p-4">
         <textarea
           v-model="commentText"
           class="input mb-2 h-24 resize-none"
-          :placeholder="replyTo ? `回复 #${replyTo}` : '写下你的回复'"
+          :placeholder="replyTo ? t('replyTo', { id: replyTo }) : t('writeReply')"
         ></textarea>
         <div class="flex flex-wrap items-center gap-3">
           <label class="flex cursor-pointer items-center gap-1.5 text-sm text-slate-600">
-            <input type="checkbox" v-model="commentAnon" class="rounded border-slate-300" /> 匿名
+            <input type="checkbox" v-model="commentAnon" class="rounded border-slate-300" /> {{ t('anonymous') }}
           </label>
           <span v-if="replyTo" class="text-xs text-slate-500">
-            回复 #{{ replyTo }}
-            <button @click="replyTo = null" class="ml-1 text-red-600 hover:underline">取消</button>
+            {{ t('replyTo', { id: replyTo }) }}
+            <button @click="replyTo = null" class="ml-1 text-red-600 hover:underline">{{ t('cancel') }}</button>
           </span>
           <button @click="submitComment" :disabled="!commentText.trim() || submitting" class="btn-primary ml-auto">
-            {{ submitting ? '提交中...' : '回复' }}
+            {{ submitting ? t('submitting') : t('reply') }}
           </button>
         </div>
         <p v-if="commentError" class="mt-2 text-xs text-red-600">{{ commentError }}</p>
       </div>
       <p v-else class="mb-4 text-sm text-slate-500">
-        <router-link to="/login" class="link">登录</router-link> 后参与讨论
+        <router-link to="/login" class="link">{{ t('login') }}</router-link> {{ t('loginToDiscuss') }}
       </p>
 
       <div class="space-y-3">
@@ -74,24 +74,24 @@
       <div v-if="showEdit" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
         <div class="panel w-full max-w-lg bg-white p-5">
           <div class="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
-            <h2 class="text-base font-semibold text-slate-950">编辑帖子</h2>
-            <button @click="showEdit = false" class="text-sm text-slate-500 hover:text-slate-950">关闭</button>
+            <h2 class="text-base font-semibold text-slate-950">{{ t('editPost') }}</h2>
+            <button @click="showEdit = false" class="text-sm text-slate-500 hover:text-slate-950">{{ t('close') }}</button>
           </div>
           <form @submit.prevent="savePost" class="space-y-3">
-            <input v-model.trim="editPost.title" required class="input" placeholder="标题" />
+            <input v-model.trim="editPost.title" required class="input" :placeholder="t('titlePlaceholder')" />
             <select v-model="editPost.category" class="select">
-              <option v-for="category in writableCategories" :key="category" :value="category">{{ category }}</option>
+              <option v-for="category in writableCategories" :key="category" :value="category">{{ categoryLabel(category) }}</option>
             </select>
-            <textarea v-model.trim="editPost.content" required class="input h-36 resize-none" placeholder="内容"></textarea>
-            <input v-model.trim="editPost.department_tag" class="input" placeholder="专攻标签（可选）" />
+            <textarea v-model.trim="editPost.content" required class="input h-36 resize-none" :placeholder="t('contentPlaceholder')"></textarea>
+            <input v-model.trim="editPost.department_tag" class="input" :placeholder="t('departmentTagPlaceholder')" />
             <label v-if="auth.isAdmin" class="flex cursor-pointer items-center gap-2 text-sm text-slate-600">
               <input type="checkbox" v-model="editPost.is_pinned" class="rounded border-slate-300" />
-              置顶公告
+              {{ t('pinAnnouncement') }}
             </label>
             <p v-if="postError" class="text-sm text-red-600">{{ postError }}</p>
             <div class="flex justify-end gap-3 pt-2">
-              <button type="button" @click="showEdit = false" class="btn-secondary">取消</button>
-              <button type="submit" :disabled="savingPost" class="btn-primary">{{ savingPost ? '保存中...' : '保存' }}</button>
+              <button type="button" @click="showEdit = false" class="btn-secondary">{{ t('cancel') }}</button>
+              <button type="submit" :disabled="savingPost" class="btn-primary">{{ savingPost ? t('saving') : t('save') }}</button>
             </div>
           </form>
         </div>
@@ -100,21 +100,21 @@
       <div v-if="reportTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
         <div class="panel w-full max-w-md bg-white p-5">
           <div class="mb-4 border-b border-slate-200 pb-3">
-            <h2 class="text-base font-semibold text-slate-950">举报内容</h2>
+            <h2 class="text-base font-semibold text-slate-950">{{ t('reportContent') }}</h2>
           </div>
           <form @submit.prevent="submitReport" class="space-y-3">
             <select v-model="reportForm.reason" class="select">
-              <option value="spam">广告 / 灌水</option>
-              <option value="abuse">攻击 / 骚扰</option>
-              <option value="privacy">隐私风险</option>
-              <option value="other">其他</option>
+              <option value="spam">{{ t('reportReasonSpam') }}</option>
+              <option value="abuse">{{ t('reportReasonAbuse') }}</option>
+              <option value="privacy">{{ t('reportReasonPrivacy') }}</option>
+              <option value="other">{{ t('reportReasonOther') }}</option>
             </select>
-            <textarea v-model.trim="reportForm.details" class="input h-24 resize-none" placeholder="补充说明（可选）"></textarea>
+            <textarea v-model.trim="reportForm.details" class="input h-24 resize-none" :placeholder="t('reportDetailsPlaceholder')"></textarea>
             <p v-if="reportError" class="text-sm text-red-600">{{ reportError }}</p>
             <p v-if="reportMessage" class="text-sm text-teal-700">{{ reportMessage }}</p>
             <div class="flex justify-end gap-3 pt-2">
-              <button type="button" @click="closeReport" class="btn-secondary">取消</button>
-              <button type="submit" :disabled="reporting" class="btn-primary">{{ reporting ? '提交中...' : '提交举报' }}</button>
+              <button type="button" @click="closeReport" class="btn-secondary">{{ t('cancel') }}</button>
+              <button type="submit" :disabled="reporting" class="btn-primary">{{ reporting ? t('submitting') : t('submitReport') }}</button>
             </div>
           </form>
         </div>
@@ -128,10 +128,12 @@ import { computed, defineComponent, h, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import { useI18n } from '@/i18n'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const { t, categoryLabel, sourceLabel, formatDate } = useI18n()
 const postId = route.params.id as string
 const categories = ['课程', '研究室', '生活', '租房', '就职', '闲聊']
 const writableCategories = computed(() => auth.isAdmin ? ['公告', ...categories] : categories)
@@ -170,15 +172,15 @@ const CommentBlock = defineComponent({
         (props.comment as any).author.source === 'agent'
           ? h('span', { class: 'tag-accent' }, (props.comment as any).author.display_name === 'Yutoko' ? 'Yutoko' : 'Agent')
           : null,
-        h('span', { class: 'ml-auto' }, formatTime((props.comment as any).created_at)),
+        h('span', { class: 'ml-auto' }, formatDate((props.comment as any).created_at)),
         auth.isLoggedIn && !(props.comment as any).is_deleted
-          ? h('button', { class: 'link text-xs', onClick: () => emit('reply', (props.comment as any).id) }, `# ${(props.comment as any).id} 引用`)
+          ? h('button', { class: 'link text-xs', onClick: () => emit('reply', (props.comment as any).id) }, t('quote', { id: (props.comment as any).id }))
           : null,
         (props.comment as any).can_delete
-          ? h('button', { class: 'text-xs text-red-600 hover:underline', onClick: () => emit('remove', (props.comment as any).id) }, '删除')
+          ? h('button', { class: 'text-xs text-red-600 hover:underline', onClick: () => emit('remove', (props.comment as any).id) }, t('delete'))
           : null,
         auth.isLoggedIn && !(props.comment as any).is_deleted && !(props.comment as any).can_delete
-          ? h('button', { class: 'text-xs text-slate-500 hover:underline', onClick: () => emit('report', (props.comment as any).id) }, '举报')
+          ? h('button', { class: 'text-xs text-slate-500 hover:underline', onClick: () => emit('report', (props.comment as any).id) }, t('report'))
           : null
       ]),
       h(
@@ -235,14 +237,14 @@ async function savePost() {
     post.value = data
     showEdit.value = false
   } catch (e: any) {
-    postError.value = e.response?.data?.detail || '保存失败'
+    postError.value = e.response?.data?.detail || t('saveFailed')
   } finally {
     savingPost.value = false
   }
 }
 
 async function deletePost() {
-  if (!window.confirm('确认删除这篇帖子？')) return
+  if (!window.confirm(t('confirmDeletePost'))) return
   await api.delete(`/posts/${postId}`)
   router.push('/')
 }
@@ -261,14 +263,14 @@ async function submitComment() {
     await refreshPostAndComments()
     notifyMascot('comment-created')
   } catch (e: any) {
-    commentError.value = e.response?.data?.detail || '提交失败'
+    commentError.value = e.response?.data?.detail || t('submitFailed')
   } finally {
     submitting.value = false
   }
 }
 
 async function deleteComment(id: number) {
-  if (!window.confirm('确认删除这条评论？')) return
+  if (!window.confirm(t('confirmDeleteComment'))) return
   await api.delete(`/comments/${id}`)
   await refreshPostAndComments()
 }
@@ -298,18 +300,14 @@ async function submitReport() {
       reason: reportForm.value.reason,
       details: reportForm.value.details || null
     })
-    reportMessage.value = '举报已提交'
+    reportMessage.value = t('reportSubmitted')
     notifyMascot('report-sent')
     window.setTimeout(closeReport, 800)
   } catch (e: any) {
-    reportError.value = e.response?.data?.detail || '提交失败'
+    reportError.value = e.response?.data?.detail || t('submitFailed')
   } finally {
     reporting.value = false
   }
-}
-
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function notifyMascot(context: string) {

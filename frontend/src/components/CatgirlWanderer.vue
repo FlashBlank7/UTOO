@@ -14,7 +14,7 @@
     @pointermove="focusLive2D"
   >
     <div v-if="message" class="mascot-companion__bubble" aria-live="polite">
-      <span class="mascot-companion__label">{{ currentOutfit.label }}</span>
+      <span class="mascot-companion__label">{{ outfitLabel }}</span>
       {{ message }}
     </div>
 
@@ -51,8 +51,8 @@
       <button
         type="button"
         class="mascot-companion__tool"
-        :title="live2dDisabled ? '启用 Live2D' : '关闭 Live2D'"
-        :aria-label="live2dDisabled ? '启用 Live2D' : '关闭 Live2D'"
+        :title="live2dDisabled ? mascotText.enableLive2d : mascotText.disableLive2d"
+        :aria-label="live2dDisabled ? mascotText.enableLive2d : mascotText.disableLive2d"
         @click="toggleLive2D"
       >
         {{ live2dDisabled ? '2D' : 'PNG' }}
@@ -60,8 +60,8 @@
       <button
         type="button"
         class="mascot-companion__tool"
-        aria-label="隐藏看板娘"
-        title="隐藏看板娘"
+        :aria-label="mascotText.hide"
+        :title="mascotText.hide"
         @click="hideMascot"
       >
         ×
@@ -74,6 +74,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { mascotOutfits, neutralMascotImage } from '@/assets/mascot/manifest'
+import { useI18n, type Locale } from '@/i18n'
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'fallback'
 
@@ -85,6 +86,7 @@ const positionKey = 'utoo_mascot_position'
 const dayOverrideKey = 'utoo_mascot_day'
 
 const route = useRoute()
+const { currentLocale } = useI18n()
 const rootEl = ref<HTMLElement | null>(null)
 const dragEl = ref<HTMLElement | null>(null)
 const live2dHost = ref<HTMLElement | null>(null)
@@ -106,31 +108,144 @@ let live2dApp: any
 let live2dModel: any
 let dragStart: { pointerId: number; x: number; y: number; originX: number; originY: number; moved: boolean } | null = null
 
-const routeMessages: Record<string, string[]> = {
-  home: ['索引巡检完成', '我在右下角值班', '公告区优先级最高', '搜索结果已同步'],
-  post: ['这串讨论有新线索', '回复前先校准语气', '引用关系已记录', '我在旁边看楼层'],
-  login: ['认证入口已就绪', '欢迎回来，先登录', '会话令牌准备中'],
-  register: ['新账号登记中', '名字可以短，讨论要长', '注册后就能发帖了']
+const mascotCopy: Record<Locale, {
+  text: {
+    enableLive2d: string
+    disableLive2d: string
+    hide: string
+    labelPrefix: string
+    outfitPrefix: string
+    fallback: string
+    pngMode: string
+    live2dLoading: string
+    live2dReady: string
+  }
+  routes: Record<string, string[]>
+  events: Record<string, string[]>
+  clicks: string[]
+  outfits: Record<string, string>
+}> = {
+  zh: {
+    text: {
+      enableLive2d: '启用 Live2D',
+      disableLive2d: '关闭 Live2D',
+      hide: '隐藏看板娘',
+      labelPrefix: 'UTOO 常驻看板娘',
+      outfitPrefix: '今天穿的是：',
+      fallback: '值班中',
+      pngMode: '已切换到 PNG 模式',
+      live2dLoading: '正在尝试加载 Live2D',
+      live2dReady: 'Live2D 已就绪'
+    },
+    routes: {
+      home: ['索引巡检完成', '我在右下角值班', '公告区优先级最高', '搜索结果已同步'],
+      post: ['这串讨论有新线索', '回复前先校准语气', '引用关系已记录', '我在旁边看楼层'],
+      login: ['认证入口已就绪', '欢迎回来，先登录', '会话令牌准备中'],
+      register: ['新账号登记中', '名字可以短，讨论要长', '注册后就能发帖了']
+    },
+    events: {
+      'post-created': ['新帖已进入索引', '发布完成，我去巡逻首页'],
+      'comment-created': ['回复写入讨论串', '楼层更新完成'],
+      'report-sent': ['举报已进入处理队列', '管理员会看到这条线索'],
+      'search-applied': ['搜索条件已应用', '我帮你看着结果列表'],
+      'empty-list': ['这里暂时没有帖子', '空列表也算一种秩序']
+    },
+    clicks: ['收到，继续值班', '不要戳太快，我在上班', '今天穿的是：', 'Live2D 插槽已准备好'],
+    outfits: {
+      sunday: 'Yutoko 银杏和风',
+      monday: 'Yutoko 研究室蓝牌',
+      tuesday: 'Yutoko 蓝黄校园针织',
+      wednesday: 'Yutoko 银杏通勤',
+      thursday: 'Yutoko 技术研究室',
+      friday: 'Yutoko 赤门咖啡',
+      saturday: 'Yutoko 校园社群'
+    }
+  },
+  en: {
+    text: {
+      enableLive2d: 'Enable Live2D',
+      disableLive2d: 'Disable Live2D',
+      hide: 'Hide mascot',
+      labelPrefix: 'UTOO resident mascot',
+      outfitPrefix: 'Today outfit: ',
+      fallback: 'On duty',
+      pngMode: 'Switched to PNG mode',
+      live2dLoading: 'Trying to load Live2D',
+      live2dReady: 'Live2D is ready'
+    },
+    routes: {
+      home: ['Index check complete', 'Standing by in the corner', 'Announcements stay on top', 'Search state synced'],
+      post: ['New clues in this thread', 'Keep replies calibrated', 'Quote links recorded', 'Watching the thread from here'],
+      login: ['Auth gate ready', 'Welcome back, please log in', 'Session token standby'],
+      register: ['New account registration', 'Names can be short; discussion should be rich', 'Register to start posting']
+    },
+    events: {
+      'post-created': ['New post indexed', 'Published. I will patrol the home page'],
+      'comment-created': ['Reply added to the thread', 'Comment floor updated'],
+      'report-sent': ['Report entered the queue', 'Admins will see this signal'],
+      'search-applied': ['Search filter applied', 'I will watch the result list'],
+      'empty-list': ['No posts here yet', 'An empty list is still order']
+    },
+    clicks: ['Got it, staying on duty', 'Not too fast; I am working', 'Today outfit: ', 'Live2D slot is ready'],
+    outfits: {
+      sunday: 'Yutoko ginkgo wafuu',
+      monday: 'Yutoko lab blue ID',
+      tuesday: 'Yutoko blue-yellow campus knit',
+      wednesday: 'Yutoko ginkgo commute',
+      thursday: 'Yutoko tech lab jacket',
+      friday: 'Yutoko Akamon cafe',
+      saturday: 'Yutoko campus hoodie'
+    }
+  },
+  ja: {
+    text: {
+      enableLive2d: 'Live2D を有効化',
+      disableLive2d: 'Live2D を無効化',
+      hide: '看板娘を隠す',
+      labelPrefix: 'UTOO 常駐看板娘',
+      outfitPrefix: '今日の服：',
+      fallback: '待機中',
+      pngMode: 'PNG モードに切り替えました',
+      live2dLoading: 'Live2D を読み込みます',
+      live2dReady: 'Live2D の準備ができました'
+    },
+    routes: {
+      home: ['索引チェック完了', '右下で待機中', 'お知らせを優先表示します', '検索結果を同期しました'],
+      post: ['このスレッドに新しい手がかり', '返信前にトーン確認', '引用関係を記録しました', 'ここでスレッドを見守ります'],
+      login: ['認証入口は準備完了', 'おかえりなさい、ログインしてください', 'セッショントークン待機中'],
+      register: ['新規アカウント登録中', '名前は短く、議論は濃く', '登録すると投稿できます']
+    },
+    events: {
+      'post-created': ['新しい投稿を索引に追加しました', '投稿完了、ホームを見回ります'],
+      'comment-created': ['返信をスレッドに追加しました', 'コメント階層を更新しました'],
+      'report-sent': ['通報は処理キューに入りました', '管理者にこの手がかりが届きます'],
+      'search-applied': ['検索条件を適用しました', '結果一覧を見守ります'],
+      'empty-list': ['ここにはまだ投稿がありません', '空の一覧にも秩序があります']
+    },
+    clicks: ['了解、待機を続けます', 'つつきすぎ注意、勤務中です', '今日の服：', 'Live2D スロット準備済み'],
+    outfits: {
+      sunday: 'Yutoko 銀杏和風',
+      monday: 'Yutoko 研究室ブルーID',
+      tuesday: 'Yutoko 青黄キャンパスニット',
+      wednesday: 'Yutoko 銀杏通学',
+      thursday: 'Yutoko 技術研究室',
+      friday: 'Yutoko 赤門カフェ',
+      saturday: 'Yutoko キャンパス社群'
+    }
+  }
 }
-
-const eventMessages: Record<string, string[]> = {
-  'post-created': ['新帖已进入索引', '发布完成，我去巡逻首页'],
-  'comment-created': ['回复写入讨论串', '楼层更新完成'],
-  'report-sent': ['举报已进入处理队列', '管理员会看到这条线索'],
-  'search-applied': ['搜索条件已应用', '我帮你看着结果列表'],
-  'empty-list': ['这里暂时没有帖子', '空列表也算一种秩序']
-}
-
-const clickMessages = ['收到，继续值班', '不要戳太快，我在上班', '今天穿的是：', 'Live2D 插槽已准备好']
 
 const currentOutfit = computed(() => {
   const weekday = readOutfitDay()
   return mascotOutfits.find((outfit) => outfit.weekday === weekday) ?? mascotOutfits[1]
 })
 
+const mascotLocale = computed(() => mascotCopy[currentLocale.value])
+const mascotText = computed(() => mascotLocale.value.text)
+const outfitLabel = computed(() => mascotLocale.value.outfits[currentOutfit.value.id] ?? currentOutfit.value.label)
 const canRender = computed(() => !hidden.value && canAppear())
 const usingFallback = computed(() => live2dDisabled.value || !live2dReady.value)
-const companionLabel = computed(() => `UTOO 常驻看板娘，${currentOutfit.value.theme}`)
+const companionLabel = computed(() => `${mascotText.value.labelPrefix}, ${outfitLabel.value}`)
 const mascotPose = computed(() => readMascotPose())
 const poseClass = computed(() => `mascot-companion--${mascotPose.value}`)
 const positionStyle = computed(() => ({
@@ -172,8 +287,8 @@ function readOutfitDay() {
 }
 
 function pickLine(lines: string[]) {
-  const line = lines[Math.floor(Math.random() * lines.length)] || '值班中'
-  return line === '今天穿的是：' ? `${line}${currentOutfit.value.theme}` : line
+  const line = lines[Math.floor(Math.random() * lines.length)] || mascotText.value.fallback
+  return line === mascotText.value.outfitPrefix ? `${line}${outfitLabel.value}` : line
 }
 
 function updateReducedMotion() {
@@ -276,19 +391,19 @@ function scheduleIdleMessage() {
   window.clearTimeout(idleTimer)
   if (!canAppear() || hidden.value) return
   idleTimer = window.setTimeout(() => {
-    showMessage(pickLine(routeMessages[routeContext()]), 4600)
+    showMessage(pickLine(mascotLocale.value.routes[routeContext()]), 4600)
   }, 26000 + Math.random() * 28000)
 }
 
 function react(messageText?: string) {
   if (!canAppear() || hidden.value) return
-  showMessage(messageText || pickLine(routeMessages[routeContext()]))
+  showMessage(messageText || pickLine(mascotLocale.value.routes[routeContext()]))
   playLive2DReaction()
 }
 
 function reactToClick() {
   if (dragStart?.moved) return
-  react(pickLine(clickMessages))
+  react(pickLine(mascotLocale.value.clicks))
 }
 
 function hideMascot() {
@@ -305,10 +420,10 @@ function toggleLive2D() {
     window.localStorage.setItem(live2dDisabledKey, '1')
     disposeLive2D()
     loadState.value = 'fallback'
-    showMessage('已切换到 PNG 模式')
+    showMessage(mascotText.value.pngMode)
   } else {
     window.localStorage.removeItem(live2dDisabledKey)
-    showMessage('正在尝试加载 Live2D')
+    showMessage(mascotText.value.live2dLoading)
     scheduleLive2DLoad(150)
   }
 }
@@ -319,7 +434,7 @@ function handleMascotEvent(event: Event) {
     react(detail.message)
     return
   }
-  const lines = detail?.context ? eventMessages[detail.context] : null
+  const lines = detail?.context ? mascotLocale.value.events[detail.context] : null
   if (lines) react(pickLine(lines))
 }
 
@@ -408,7 +523,7 @@ async function loadLive2D() {
     live2dApp.stage.addChild(live2dModel)
     live2dReady.value = true
     loadState.value = 'ready'
-    showMessage('Live2D 已就绪')
+    showMessage(mascotText.value.live2dReady)
   } catch (error) {
     console.info('[UTOO mascot] Live2D fallback:', error)
     disposeLive2D()
@@ -517,7 +632,7 @@ onMounted(async () => {
   initPosition()
   await nextTick()
   ready.value = true
-  showMessage(pickLine(routeMessages[routeContext()]), 4800)
+  showMessage(pickLine(mascotLocale.value.routes[routeContext()]), 4800)
   scheduleLive2DLoad()
 })
 
@@ -537,8 +652,12 @@ onBeforeUnmount(() => {
 watch(() => route.fullPath, () => {
   if (!canAppear()) return
   initPosition()
-  showMessage(pickLine(routeMessages[routeContext()]), 4200)
+  showMessage(pickLine(mascotLocale.value.routes[routeContext()]), 4200)
   scheduleLive2DLoad(250)
+})
+
+watch(currentLocale, () => {
+  if (message.value) showMessage(pickLine(mascotLocale.value.routes[routeContext()]), 4200)
 })
 </script>
 

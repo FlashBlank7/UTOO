@@ -1,44 +1,44 @@
 <template>
   <div class="mx-auto max-w-xl px-4 py-8">
     <div class="mb-6 border-b border-slate-200 pb-5">
-      <p class="meta mb-1">Account</p>
-      <h1 class="text-2xl font-semibold text-slate-950">我的信息</h1>
+      <p class="meta mb-1">{{ t('account') }}</p>
+      <h1 class="text-2xl font-semibold text-slate-950">{{ t('accountTitle') }}</h1>
     </div>
 
     <form @submit.prevent="saveProfile" class="panel bg-white p-5 space-y-4">
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">用户名</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('username') }}</label>
         <input :value="auth.user?.username || ''" disabled class="input" />
       </div>
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">昵称</label>
-        <input v-model.trim="profile.display_name" class="input" placeholder="公开展示名，可留空" />
+        <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('displayName') }}</label>
+        <input v-model.trim="profile.display_name" class="input" :placeholder="t('displayNamePlaceholder')" />
       </div>
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">专攻 / 研究科</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('department') }}</label>
         <input v-model.trim="profile.department" required class="input" />
       </div>
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">邮箱</label>
-        <input v-model.trim="profile.email" type="email" class="input" placeholder="可选" />
+        <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('email') }}</label>
+        <input v-model.trim="profile.email" type="email" class="input" :placeholder="t('optional')" />
       </div>
 
       <p v-if="profileMessage" class="text-sm text-teal-700">{{ profileMessage }}</p>
       <p v-if="profileError" class="text-sm text-red-600">{{ profileError }}</p>
 
       <button type="submit" :disabled="savingProfile" class="btn-primary">
-        {{ savingProfile ? '保存中...' : '保存资料' }}
+        {{ savingProfile ? t('savingProfile') : t('saveProfile') }}
       </button>
     </form>
 
     <form @submit.prevent="changePassword" class="panel mt-6 bg-white p-5 space-y-4">
-      <h2 class="font-semibold text-slate-950">修改密码</h2>
+      <h2 class="font-semibold text-slate-950">{{ t('changePassword') }}</h2>
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">当前密码</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('currentPassword') }}</label>
         <input v-model="password.current_password" type="password" required class="input" />
       </div>
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">新密码</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('newPassword') }}</label>
         <input v-model="password.new_password" type="password" required minlength="6" class="input" />
       </div>
 
@@ -46,7 +46,7 @@
       <p v-if="passwordError" class="text-sm text-red-600">{{ passwordError }}</p>
 
       <button type="submit" :disabled="savingPassword" class="btn-primary">
-        {{ savingPassword ? '更新中...' : '更新密码' }}
+        {{ savingPassword ? t('updatingPassword') : t('updatePassword') }}
       </button>
     </form>
   </div>
@@ -56,8 +56,10 @@
 import { onMounted, ref } from 'vue'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import { useI18n } from '@/i18n'
 
 const auth = useAuthStore()
+const { t } = useI18n()
 
 const profile = ref({ display_name: '', department: '', email: '' })
 const password = ref({ current_password: '', new_password: '' })
@@ -88,9 +90,9 @@ async function saveProfile() {
     })
     await auth.fetchMe()
     hydrateProfile()
-    profileMessage.value = '资料已保存'
+    profileMessage.value = t('profileSaved')
   } catch (e: any) {
-    profileError.value = e.response?.data?.detail || '保存失败'
+    profileError.value = e.response?.data?.detail || t('profileSaveFailed')
   } finally {
     savingProfile.value = false
   }
@@ -106,9 +108,9 @@ async function changePassword() {
       new_password: password.value.new_password
     })
     password.value = { current_password: '', new_password: '' }
-    passwordMessage.value = '密码已更新'
+    passwordMessage.value = t('passwordUpdated')
   } catch (e: any) {
-    passwordError.value = e.response?.data?.detail || '更新失败'
+    passwordError.value = e.response?.data?.detail || t('passwordUpdateFailed')
   } finally {
     savingPassword.value = false
   }

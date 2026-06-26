@@ -1,27 +1,27 @@
 <template>
   <div class="mx-auto max-w-md px-4 py-16">
     <div class="mb-8 border-b border-slate-200 pb-5">
-      <p class="meta mb-1">Account</p>
-      <h1 class="text-2xl font-semibold text-slate-950">登录 UTOO</h1>
+      <p class="meta mb-1">{{ t('account') }}</p>
+      <h1 class="text-2xl font-semibold text-slate-950">{{ t('loginTitle') }}</h1>
     </div>
     <form @submit.prevent="submit" class="panel bg-white p-5 space-y-4">
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">用户名或邮箱</label>
-        <input v-model.trim="identifier" required class="input" placeholder="用户名 或 邮箱" />
+        <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('usernameOrEmail') }}</label>
+        <input v-model.trim="identifier" required class="input" :placeholder="t('loginIdentifierPlaceholder')" />
       </div>
       <div>
-        <label class="mb-1 block text-sm font-medium text-slate-700">密码</label>
+        <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('password') }}</label>
         <input v-model="password" type="password" required class="input" />
       </div>
 
       <p v-if="error" class="text-sm text-red-600">{{ error }}</p>
 
       <button type="submit" :disabled="loading" class="btn-primary w-full">
-        {{ loading ? '登录中...' : '登录' }}
+        {{ loading ? t('loggingIn') : t('login') }}
       </button>
 
       <p class="text-center text-sm text-slate-500">
-        没有账号？<router-link :to="{ path: '/register', query: nextQuery }" class="link">注册</router-link>
+        {{ t('noAccount') }} <router-link :to="{ path: '/register', query: nextQuery }" class="link">{{ t('register') }}</router-link>
       </p>
     </form>
   </div>
@@ -32,10 +32,12 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
+import { useI18n } from '@/i18n'
 
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const { t } = useI18n()
 const identifier = ref('')
 const password = ref('')
 const error = ref('')
@@ -64,7 +66,7 @@ async function submit() {
     await auth.fetchMe()
     router.replace(nextPath())
   } catch {
-    error.value = '登录失败，请检查账号密码'
+    error.value = t('loginFailed')
   } finally {
     loading.value = false
   }

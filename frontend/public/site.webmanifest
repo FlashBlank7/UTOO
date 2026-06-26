@@ -1,7 +1,7 @@
 {
-  "name": "UTOO | UTokyo 学生社区",
+  "name": "UTOO | UTokyo Student Community",
   "short_name": "UTOO",
-  "description": "面向 UTokyo 学生的课程、研究室、生活、租房与就职讨论空间。",
+  "description": "Independent student community for UTokyo courses, labs, life, housing, and careers.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f8fafc",

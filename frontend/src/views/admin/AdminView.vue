@@ -2,41 +2,41 @@
   <div class="mx-auto max-w-6xl px-4 py-8">
     <div class="mb-6 border-b border-slate-200 pb-5">
       <p class="meta mb-1">Admin</p>
-      <h1 class="text-2xl font-semibold text-slate-950">管理后台</h1>
+      <h1 class="text-2xl font-semibold text-slate-950">{{ t('adminTitle') }}</h1>
     </div>
 
     <div class="mb-6 flex gap-1 border-b border-slate-200">
       <button
-        v-for="t in tabs"
-        :key="t.key"
-        @click="activeTab = t.key"
+        v-for="tab in tabs"
+        :key="tab.key"
+        @click="activeTab = tab.key"
         :class="[
           'border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-          activeTab === t.key
+          activeTab === tab.key
             ? 'border-slate-950 text-slate-950'
             : 'border-transparent text-slate-500 hover:text-slate-900'
         ]"
       >
-        {{ t.label }}
+        {{ t(tab.labelKey) }}
       </button>
     </div>
 
     <template v-if="activeTab === 'codes'">
       <div class="mb-4 flex flex-wrap items-center gap-3">
-        <input v-model.number="newMaxUses" type="number" min="1" class="input w-32" placeholder="上限" />
+        <input v-model.number="newMaxUses" type="number" min="1" class="input w-32" :placeholder="t('maxUsesPlaceholder')" />
         <button @click="generateCode" :disabled="generating" class="btn-primary">
-          {{ generating ? '生成中...' : '生成激活码' }}
+          {{ generating ? t('generatingCode') : t('generateCode') }}
         </button>
       </div>
       <div class="panel overflow-x-auto">
         <table class="w-full min-w-[760px] text-sm">
           <thead class="table-head">
             <tr>
-              <th class="px-4 py-3 text-left">激活码</th>
-              <th class="px-4 py-3 text-center">已用 / 上限</th>
-              <th class="px-4 py-3 text-center">状态</th>
-              <th class="px-4 py-3 text-center">创建时间</th>
-              <th class="px-4 py-3 text-center">操作</th>
+              <th class="px-4 py-3 text-left">{{ t('activationCodeColumn') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('usedLimit') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('status') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('createdAt') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('action') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -44,29 +44,29 @@
               <td class="px-4 py-3 font-mono font-semibold text-slate-800">{{ code.code }}</td>
               <td class="px-4 py-3 text-center">{{ code.use_count }} / {{ code.max_uses }}</td>
               <td class="px-4 py-3 text-center">
-                <span :class="code.is_active ? 'tag-accent' : 'tag'">{{ code.is_active ? '有效' : '已停用' }}</span>
+                <span :class="code.is_active ? 'tag-accent' : 'tag'">{{ code.is_active ? t('active') : t('inactive') }}</span>
               </td>
               <td class="px-4 py-3 text-center text-slate-500">{{ formatDate(code.created_at) }}</td>
               <td class="px-4 py-3 text-center">
-                <button v-if="code.is_active" @click="deactivateCode(code.id)" class="text-xs text-red-600 hover:underline">停用</button>
-                <button @click="viewUsages(code)" class="link ml-3 text-xs">查看用户</button>
+                <button v-if="code.is_active" @click="deactivateCode(code.id)" class="text-xs text-red-600 hover:underline">{{ t('deactivate') }}</button>
+                <button @click="viewUsages(code)" class="link ml-3 text-xs">{{ t('viewUsers') }}</button>
               </td>
             </tr>
           </tbody>
         </table>
-        <div v-if="codes.length === 0" class="py-8 text-center text-sm text-slate-500">暂无激活码</div>
+        <div v-if="codes.length === 0" class="py-8 text-center text-sm text-slate-500">{{ t('noActivationCodes') }}</div>
       </div>
 
       <div v-if="selectedCode" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
         <div class="panel w-full max-w-md bg-white p-5">
           <div class="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
-            <h3 class="font-semibold text-slate-950">{{ selectedCode.code }} 注册用户</h3>
-            <button @click="selectedCode = null" class="text-sm text-slate-500 hover:text-slate-950">关闭</button>
+            <h3 class="font-semibold text-slate-950">{{ t('registeredUsersTitle', { code: selectedCode.code }) }}</h3>
+            <button @click="selectedCode = null" class="text-sm text-slate-500 hover:text-slate-950">{{ t('close') }}</button>
           </div>
-          <div v-if="usages.length === 0" class="py-4 text-center text-sm text-slate-500">暂无用户</div>
+          <div v-if="usages.length === 0" class="py-4 text-center text-sm text-slate-500">{{ t('noUsers') }}</div>
           <ul v-else class="space-y-2 text-sm">
             <li v-for="u in usages" :key="u.user_id" class="flex justify-between gap-3 text-slate-700">
-              <span>{{ u.display_name || u.username || `用户${u.user_id}` }} · {{ u.department }}</span>
+              <span>{{ u.display_name || u.username || t('navAccountFallback', { id: u.user_id }) }} · {{ u.department }}</span>
               <span class="shrink-0 text-slate-500">{{ formatDate(u.used_at) }}</span>
             </li>
           </ul>
@@ -79,14 +79,14 @@
         <table class="w-full min-w-[860px] text-sm">
           <thead class="table-head">
             <tr>
-              <th class="px-4 py-3 text-left">ID</th>
-              <th class="px-4 py-3 text-left">用户名</th>
-              <th class="px-4 py-3 text-left">昵称</th>
-              <th class="px-4 py-3 text-left">专攻</th>
-              <th class="px-4 py-3 text-center">角色</th>
-              <th class="px-4 py-3 text-center">状态</th>
-              <th class="px-4 py-3 text-center">注册时间</th>
-              <th class="px-4 py-3 text-center">操作</th>
+              <th class="px-4 py-3 text-left">{{ t('id') }}</th>
+              <th class="px-4 py-3 text-left">{{ t('username') }}</th>
+              <th class="px-4 py-3 text-left">{{ t('displayName') }}</th>
+              <th class="px-4 py-3 text-left">{{ t('department') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('role') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('status') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('registeredAt') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('action') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -96,24 +96,24 @@
               <td class="px-4 py-3 text-slate-700">{{ u.display_name || '-' }}</td>
               <td class="px-4 py-3 text-slate-700">{{ u.department }}</td>
               <td class="px-4 py-3 text-center">
-                <span :class="u.is_admin ? 'tag-accent' : 'tag'">{{ u.is_admin ? '管理员' : '用户' }}</span>
+                <span :class="u.is_admin ? 'tag-accent' : 'tag'">{{ u.is_admin ? t('adminRole') : t('userRole') }}</span>
               </td>
               <td class="px-4 py-3 text-center">
-                <span v-if="u.is_banned" class="tag border-red-300 bg-red-50 text-red-700">封禁</span>
-                <span v-else-if="u.muted_until" class="tag border-amber-300 bg-amber-50 text-amber-700">禁言</span>
-                <span v-else class="tag">正常</span>
+                <span v-if="u.is_banned" class="tag border-red-300 bg-red-50 text-red-700">{{ t('banned') }}</span>
+                <span v-else-if="u.muted_until" class="tag border-amber-300 bg-amber-50 text-amber-700">{{ t('muted') }}</span>
+                <span v-else class="tag">{{ t('visibilityNormal') }}</span>
               </td>
               <td class="px-4 py-3 text-center text-slate-500">{{ formatDate(u.created_at) }}</td>
               <td class="px-4 py-3 text-center">
-                <button @click="openReset(u)" class="link text-xs">重置密码</button>
-                <button @click="muteUser(u)" class="ml-3 text-xs text-amber-700 hover:underline">禁言1天</button>
-                <button v-if="u.muted_until" @click="unmuteUser(u)" class="ml-3 text-xs text-slate-600 hover:underline">解除禁言</button>
-                <button @click="toggleBan(u)" class="ml-3 text-xs text-red-600 hover:underline">{{ u.is_banned ? '解封' : '封禁' }}</button>
+                <button @click="openReset(u)" class="link text-xs">{{ t('resetPassword') }}</button>
+                <button @click="muteUser(u)" class="ml-3 text-xs text-amber-700 hover:underline">{{ t('muteOneDay') }}</button>
+                <button v-if="u.muted_until" @click="unmuteUser(u)" class="ml-3 text-xs text-slate-600 hover:underline">{{ t('unmute') }}</button>
+                <button @click="toggleBan(u)" class="ml-3 text-xs text-red-600 hover:underline">{{ u.is_banned ? t('unban') : t('ban') }}</button>
               </td>
             </tr>
           </tbody>
         </table>
-        <div v-if="users.length === 0" class="py-8 text-center text-sm text-slate-500">暂无用户</div>
+        <div v-if="users.length === 0" class="py-8 text-center text-sm text-slate-500">{{ t('noUsers') }}</div>
       </div>
     </template>
 
@@ -122,77 +122,77 @@
         <table class="w-full min-w-[900px] text-sm">
           <thead class="table-head">
             <tr>
-              <th class="px-4 py-3 text-left">标题</th>
-              <th class="px-4 py-3 text-center">来源</th>
-              <th class="px-4 py-3 text-center">分类</th>
-              <th class="px-4 py-3 text-center">状态</th>
-              <th class="px-4 py-3 text-center">回复</th>
-              <th class="px-4 py-3 text-center">创建时间</th>
-              <th class="px-4 py-3 text-center">操作</th>
+              <th class="px-4 py-3 text-left">{{ t('title') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('source') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('category') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('status') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('replies') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('createdAt') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('action') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="post in posts" :key="post.id" class="table-row">
               <td class="px-4 py-3">
                 <router-link :to="`/post/${post.id}`" class="font-medium text-slate-900 hover:underline">{{ post.title }}</router-link>
-                <span v-if="post.is_pinned" class="tag-accent ml-2">置顶</span>
+                <span v-if="post.is_pinned" class="tag-accent ml-2">{{ t('pinned') }}</span>
               </td>
               <td class="px-4 py-3 text-center">
                 <span :class="post.author.source === 'agent' ? 'tag-accent' : 'tag'">
-                  {{ post.author.source === 'agent' ? 'Agent' : '用户' }}
+                  {{ sourceLabel(post.author.source) }}
                 </span>
               </td>
-              <td class="px-4 py-3 text-center"><span class="tag">{{ post.category }}</span></td>
+              <td class="px-4 py-3 text-center"><span class="tag">{{ categoryLabel(post.category) }}</span></td>
               <td class="px-4 py-3 text-center"><span :class="visibilityClass(post.visibility)">{{ visibilityLabel(post.visibility) }}</span></td>
               <td class="px-4 py-3 text-center text-slate-600">{{ post.comment_count }}</td>
               <td class="px-4 py-3 text-center text-slate-500">{{ formatDate(post.created_at) }}</td>
               <td class="px-4 py-3 text-center">
-                <button @click="togglePinned(post)" class="link text-xs">{{ post.is_pinned ? '取消置顶' : '置顶' }}</button>
-                <button @click="setPostVisibility(post, post.visibility === 'hidden' ? 'normal' : 'hidden')" class="ml-3 text-xs text-amber-700 hover:underline">{{ post.visibility === 'hidden' ? '恢复' : '隐藏' }}</button>
-                <button @click="deletePost(post)" class="ml-3 text-xs text-red-600 hover:underline">删除</button>
+                <button @click="togglePinned(post)" class="link text-xs">{{ post.is_pinned ? t('unpin') : t('pinned') }}</button>
+                <button @click="setPostVisibility(post, post.visibility === 'hidden' ? 'normal' : 'hidden')" class="ml-3 text-xs text-amber-700 hover:underline">{{ post.visibility === 'hidden' ? t('restore') : t('hide') }}</button>
+                <button @click="deletePost(post)" class="ml-3 text-xs text-red-600 hover:underline">{{ t('delete') }}</button>
               </td>
             </tr>
           </tbody>
         </table>
-        <div v-if="posts.length === 0" class="py-8 text-center text-sm text-slate-500">暂无帖子</div>
+        <div v-if="posts.length === 0" class="py-8 text-center text-sm text-slate-500">{{ t('noAdminPosts') }}</div>
       </div>
     </template>
 
     <template v-if="activeTab === 'announcements'">
       <form @submit.prevent="createAnnouncement" class="panel mb-4 bg-white p-4 space-y-3">
-        <input v-model.trim="announcement.title" required class="input" placeholder="公告标题" />
-        <textarea v-model.trim="announcement.content" required class="input h-28 resize-none" placeholder="公告内容"></textarea>
+        <input v-model.trim="announcement.title" required class="input" :placeholder="t('announcementTitlePlaceholder')" />
+        <textarea v-model.trim="announcement.content" required class="input h-28 resize-none" :placeholder="t('announcementContentPlaceholder')"></textarea>
         <p v-if="announcementError" class="text-sm text-red-600">{{ announcementError }}</p>
-        <button type="submit" :disabled="creatingAnnouncement" class="btn-primary">{{ creatingAnnouncement ? '发布中...' : '发布公告' }}</button>
+        <button type="submit" :disabled="creatingAnnouncement" class="btn-primary">{{ creatingAnnouncement ? t('publishingAnnouncement') : t('publishAnnouncement') }}</button>
       </form>
       <div class="panel divide-y divide-slate-200 overflow-hidden">
         <div v-for="post in announcements" :key="post.id" class="bg-white px-4 py-3">
           <div class="flex flex-wrap items-center gap-2">
             <router-link :to="`/post/${post.id}`" class="font-medium text-slate-950 hover:underline">{{ post.title }}</router-link>
             <span :class="visibilityClass(post.visibility)">{{ visibilityLabel(post.visibility) }}</span>
-            <button @click="togglePinned(post)" class="link ml-auto text-xs">{{ post.is_pinned ? '取消置顶' : '置顶' }}</button>
+            <button @click="togglePinned(post)" class="link ml-auto text-xs">{{ post.is_pinned ? t('unpin') : t('pinned') }}</button>
           </div>
           <p class="mt-1 line-clamp-2 text-sm text-slate-600">{{ post.content }}</p>
         </div>
-        <div v-if="announcements.length === 0" class="py-8 text-center text-sm text-slate-500">暂无公告</div>
+        <div v-if="announcements.length === 0" class="py-8 text-center text-sm text-slate-500">{{ t('noAnnouncements') }}</div>
       </div>
     </template>
 
     <template v-if="activeTab === 'reports'">
       <div class="mb-4 flex gap-2">
-        <button @click="reportStatus = 'pending'; loadReports()" :class="reportStatus === 'pending' ? 'btn-primary' : 'btn-secondary'">待处理</button>
-        <button @click="reportStatus = 'resolved'; loadReports()" :class="reportStatus === 'resolved' ? 'btn-primary' : 'btn-secondary'">已处理</button>
+        <button @click="reportStatus = 'pending'; loadReports()" :class="reportStatus === 'pending' ? 'btn-primary' : 'btn-secondary'">{{ t('pending') }}</button>
+        <button @click="reportStatus = 'resolved'; loadReports()" :class="reportStatus === 'resolved' ? 'btn-primary' : 'btn-secondary'">{{ t('resolved') }}</button>
       </div>
       <div class="panel overflow-x-auto">
         <table class="w-full min-w-[900px] text-sm">
           <thead class="table-head">
             <tr>
-              <th class="px-4 py-3 text-left">目标</th>
-              <th class="px-4 py-3 text-left">原因</th>
-              <th class="px-4 py-3 text-left">说明</th>
-              <th class="px-4 py-3 text-center">状态</th>
-              <th class="px-4 py-3 text-center">时间</th>
-              <th class="px-4 py-3 text-center">操作</th>
+              <th class="px-4 py-3 text-left">{{ t('target') }}</th>
+              <th class="px-4 py-3 text-left">{{ t('reason') }}</th>
+              <th class="px-4 py-3 text-left">{{ t('details') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('status') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('time') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('action') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -200,21 +200,21 @@
               <td class="px-4 py-3">{{ report.target_type }} #{{ report.target_id }}</td>
               <td class="px-4 py-3">{{ report.reason }}</td>
               <td class="px-4 py-3 text-slate-600">{{ report.details || '-' }}</td>
-              <td class="px-4 py-3 text-center"><span class="tag">{{ report.status }}</span></td>
+              <td class="px-4 py-3 text-center"><span class="tag">{{ reportStatusLabel(report.status) }}</span></td>
               <td class="px-4 py-3 text-center text-slate-500">{{ formatDate(report.created_at) }}</td>
               <td class="px-4 py-3 text-center">
                 <template v-if="report.status === 'pending'">
-                  <button @click="handleReport(report, 'resolve')" class="link text-xs">标记处理</button>
-                  <button @click="handleReport(report, 'hide')" class="ml-3 text-xs text-amber-700 hover:underline">隐藏</button>
-                  <button @click="handleReport(report, 'delete')" class="ml-3 text-xs text-red-600 hover:underline">删除</button>
-                  <button @click="handleReport(report, 'mute')" class="ml-3 text-xs text-slate-600 hover:underline">禁言作者</button>
+                  <button @click="handleReport(report, 'resolve')" class="link text-xs">{{ t('markResolved') }}</button>
+                  <button @click="handleReport(report, 'hide')" class="ml-3 text-xs text-amber-700 hover:underline">{{ t('hide') }}</button>
+                  <button @click="handleReport(report, 'delete')" class="ml-3 text-xs text-red-600 hover:underline">{{ t('delete') }}</button>
+                  <button @click="handleReport(report, 'mute')" class="ml-3 text-xs text-slate-600 hover:underline">{{ t('muteAuthor') }}</button>
                 </template>
                 <span v-else class="text-xs text-slate-500">{{ report.resolution || '-' }}</span>
               </td>
             </tr>
           </tbody>
         </table>
-        <div v-if="reports.length === 0" class="py-8 text-center text-sm text-slate-500">暂无举报</div>
+        <div v-if="reports.length === 0" class="py-8 text-center text-sm text-slate-500">{{ t('noReports') }}</div>
       </div>
     </template>
 
@@ -223,10 +223,10 @@
         <table class="w-full min-w-[760px] text-sm">
           <thead class="table-head">
             <tr>
-              <th class="px-4 py-3 text-left">动作</th>
-              <th class="px-4 py-3 text-center">目标</th>
-              <th class="px-4 py-3 text-left">原因</th>
-              <th class="px-4 py-3 text-center">时间</th>
+              <th class="px-4 py-3 text-left">{{ t('action') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('target') }}</th>
+              <th class="px-4 py-3 text-left">{{ t('reason') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('time') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -238,16 +238,16 @@
             </tr>
           </tbody>
         </table>
-        <div v-if="moderationLogs.length === 0" class="py-8 text-center text-sm text-slate-500">暂无日志</div>
+        <div v-if="moderationLogs.length === 0" class="py-8 text-center text-sm text-slate-500">{{ t('noLogs') }}</div>
       </div>
     </template>
 
     <template v-if="activeTab === 'agents'">
       <form @submit.prevent="createAgent" class="panel mb-4 grid gap-3 bg-white p-4 md:grid-cols-[180px_1fr_auto]">
-        <input v-model.trim="newAgent.name" required class="input" placeholder="Agent 名称" />
-        <input v-model.trim="newAgent.description" class="input" placeholder="说明（可选）" />
+        <input v-model.trim="newAgent.name" required class="input" :placeholder="t('agentNamePlaceholder')" />
+        <input v-model.trim="newAgent.description" class="input" :placeholder="t('agentDescriptionPlaceholder')" />
         <button type="submit" :disabled="creatingAgent" class="btn-primary">
-          {{ creatingAgent ? '创建中...' : '创建 Agent' }}
+          {{ creatingAgent ? t('creatingAgent') : t('createAgent') }}
         </button>
         <p v-if="agentError" class="text-sm text-red-600 md:col-span-3">{{ agentError }}</p>
       </form>
@@ -256,12 +256,12 @@
         <table class="w-full min-w-[900px] text-sm">
           <thead class="table-head">
             <tr>
-              <th class="px-4 py-3 text-left">名称</th>
-              <th class="px-4 py-3 text-left">说明</th>
-              <th class="px-4 py-3 text-center">Key Prefix</th>
-              <th class="px-4 py-3 text-center">状态</th>
-              <th class="px-4 py-3 text-center">最近发帖</th>
-              <th class="px-4 py-3 text-center">操作</th>
+              <th class="px-4 py-3 text-left">{{ t('name') }}</th>
+              <th class="px-4 py-3 text-left">{{ t('description') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('keyPrefix') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('status') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('lastPosted') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('action') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -270,35 +270,35 @@
               <td class="px-4 py-3 text-slate-600">{{ agent.description || '-' }}</td>
               <td class="px-4 py-3 text-center font-mono text-xs text-slate-600">{{ agent.api_key_prefix }}</td>
               <td class="px-4 py-3 text-center">
-                <span :class="agent.is_active ? 'tag-accent' : 'tag'">{{ agent.is_active ? '启用' : '停用' }}</span>
+                <span :class="agent.is_active ? 'tag-accent' : 'tag'">{{ agent.is_active ? t('enabled') : t('disabled') }}</span>
               </td>
               <td class="px-4 py-3 text-center text-slate-500">
                 {{ agent.last_posted_at ? formatDate(agent.last_posted_at) : '-' }}
               </td>
               <td class="px-4 py-3 text-center">
-                <button @click="toggleAgent(agent)" class="link text-xs">{{ agent.is_active ? '停用' : '启用' }}</button>
-                <button @click="resetAgentKey(agent)" class="ml-3 text-xs text-red-600 hover:underline">重置 Key</button>
+                <button @click="toggleAgent(agent)" class="link text-xs">{{ agent.is_active ? t('disabled') : t('enabled') }}</button>
+                <button @click="resetAgentKey(agent)" class="ml-3 text-xs text-red-600 hover:underline">{{ t('resetKey') }}</button>
               </td>
             </tr>
           </tbody>
         </table>
-        <div v-if="agents.length === 0" class="py-8 text-center text-sm text-slate-500">暂无 Agent</div>
+        <div v-if="agents.length === 0" class="py-8 text-center text-sm text-slate-500">{{ t('noAgents') }}</div>
       </div>
     </template>
 
     <div v-if="resetUser" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
       <div class="panel w-full max-w-md bg-white p-5">
         <div class="mb-4 border-b border-slate-200 pb-3">
-          <h3 class="font-semibold text-slate-950">重置密码</h3>
-          <p class="meta mt-1">{{ resetUser.display_name || resetUser.username || `用户${resetUser.id}` }}</p>
+          <h3 class="font-semibold text-slate-950">{{ t('resetPassword') }}</h3>
+          <p class="meta mt-1">{{ resetUser.display_name || resetUser.username || t('navAccountFallback', { id: resetUser.id }) }}</p>
         </div>
         <form @submit.prevent="resetPassword" class="space-y-3">
-          <input v-model="newPassword" type="password" minlength="6" required class="input" placeholder="新密码，至少 6 位" />
+          <input v-model="newPassword" type="password" minlength="6" required class="input" :placeholder="t('resetPasswordPlaceholder')" />
           <p v-if="resetError" class="text-sm text-red-600">{{ resetError }}</p>
           <p v-if="resetMessage" class="text-sm text-teal-700">{{ resetMessage }}</p>
           <div class="flex justify-end gap-3 pt-2">
-            <button type="button" @click="closeReset" class="btn-secondary">关闭</button>
-            <button type="submit" :disabled="resetting" class="btn-primary">{{ resetting ? '更新中...' : '更新密码' }}</button>
+            <button type="button" @click="closeReset" class="btn-secondary">{{ t('close') }}</button>
+            <button type="submit" :disabled="resetting" class="btn-primary">{{ resetting ? t('updatingPassword') : t('updatePassword') }}</button>
           </div>
         </form>
       </div>
@@ -308,11 +308,11 @@
       <div class="panel w-full max-w-xl bg-white p-5">
         <div class="mb-4 border-b border-slate-200 pb-3">
           <h3 class="font-semibold text-slate-950">Agent API Key</h3>
-          <p class="meta mt-1">这串 key 只显示一次，关闭后无法再次查看。</p>
+          <p class="meta mt-1">{{ t('agentKeyNotice') }}</p>
         </div>
         <pre class="overflow-x-auto rounded-[4px] border border-slate-300 bg-slate-950 p-3 text-xs text-slate-100">{{ revealedAgentKey }}</pre>
         <div class="mt-4 flex justify-end">
-          <button @click="revealedAgentKey = ''" class="btn-primary">关闭</button>
+          <button @click="revealedAgentKey = ''" class="btn-primary">{{ t('close') }}</button>
         </div>
       </div>
     </div>
@@ -322,15 +322,18 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import api from '@/api'
+import { useI18n } from '@/i18n'
+
+const { t, categoryLabel, visibilityLabel, sourceLabel, formatDate } = useI18n()
 
 const tabs = [
-  { key: 'codes', label: '激活码' },
-  { key: 'users', label: '用户' },
-  { key: 'posts', label: '内容' },
-  { key: 'announcements', label: '公告' },
-  { key: 'reports', label: '处理队列' },
-  { key: 'logs', label: '操作日志' },
-  { key: 'agents', label: 'Agent' }
+  { key: 'codes', labelKey: 'adminTabCodes' },
+  { key: 'users', labelKey: 'adminTabUsers' },
+  { key: 'posts', labelKey: 'adminTabPosts' },
+  { key: 'announcements', labelKey: 'adminTabAnnouncements' },
+  { key: 'reports', labelKey: 'adminTabReports' },
+  { key: 'logs', labelKey: 'adminTabLogs' },
+  { key: 'agents', labelKey: 'adminTabAgents' }
 ]
 const activeTab = ref('codes')
 const codes = ref<any[]>([])
@@ -435,10 +438,10 @@ async function resetPassword() {
   resetMessage.value = ''
   try {
     await api.patch(`/admin/users/${resetUser.value.id}/password`, { new_password: newPassword.value })
-    resetMessage.value = '密码已更新'
+    resetMessage.value = t('passwordResetSuccess')
     newPassword.value = ''
   } catch (e: any) {
-    resetError.value = e.response?.data?.detail || '更新失败'
+    resetError.value = e.response?.data?.detail || t('passwordResetFailed')
   } finally {
     resetting.value = false
   }
@@ -465,7 +468,7 @@ async function togglePinned(post: any) {
 }
 
 async function deletePost(post: any) {
-  if (!window.confirm('确认删除这篇帖子？')) return
+  if (!window.confirm(t('confirmDeletePost'))) return
   await api.patch(`/admin/posts/${post.id}/visibility`, { visibility: 'deleted', reason: 'manual delete' })
   await loadPosts()
 }
@@ -484,7 +487,7 @@ async function createAnnouncement() {
     announcement.value = { title: '', content: '' }
     await loadAnnouncements()
   } catch (e: any) {
-    announcementError.value = e.response?.data?.detail || '发布失败'
+    announcementError.value = e.response?.data?.detail || t('announcementCreateFailed')
   } finally {
     creatingAnnouncement.value = false
   }
@@ -510,7 +513,7 @@ async function createAgent() {
     newAgent.value = { name: '', description: '' }
     await loadAgents()
   } catch (e: any) {
-    agentError.value = e.response?.data?.detail || '创建失败'
+    agentError.value = e.response?.data?.detail || t('agentCreateFailed')
   } finally {
     creatingAgent.value = false
   }
@@ -522,26 +525,22 @@ async function toggleAgent(agent: any) {
 }
 
 async function resetAgentKey(agent: any) {
-  if (!window.confirm(`确认重置 ${agent.name} 的 API Key？旧 key 将立即失效。`)) return
+  if (!window.confirm(t('confirmResetAgentKey', { name: agent.name }))) return
   const { data } = await api.post(`/admin/agents/${agent.id}/reset-key`)
   revealedAgentKey.value = data.api_key
   await loadAgents()
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-function visibilityLabel(visibility: string) {
-  if (visibility === 'hidden') return '隐藏'
-  if (visibility === 'deleted') return '删除'
-  return '正常'
 }
 
 function visibilityClass(visibility: string) {
   if (visibility === 'hidden') return 'tag border-amber-300 bg-amber-50 text-amber-700'
   if (visibility === 'deleted') return 'tag border-red-300 bg-red-50 text-red-700'
   return 'tag'
+}
+
+function reportStatusLabel(status: string) {
+  if (status === 'pending') return t('pending')
+  if (status === 'resolved') return t('resolved')
+  return status
 }
 
 watch(activeTab, (tab) => {

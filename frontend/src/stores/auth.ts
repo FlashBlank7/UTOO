@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
+import { useI18n } from '@/i18n'
 
 interface User {
   id: number
@@ -32,10 +33,11 @@ function tokenExpiresSoon(token: string | null, skewMs = 5 * 60 * 1000) {
 }
 
 export const useAuthStore = defineStore('auth', () => {
+  const { t } = useI18n()
   const user = ref<User | null>(null)
   const isLoggedIn = computed(() => !!user.value)
   const isAdmin = computed(() => user.value?.is_admin ?? false)
-  const displayName = computed(() => user.value?.display_name || (user.value ? `用户${user.value.id}` : ''))
+  const displayName = computed(() => user.value?.display_name || (user.value ? t('navAccountFallback', { id: user.value.id }) : ''))
 
   async function ensureFreshAccess(force = false) {
     const access = localStorage.getItem('access_token')

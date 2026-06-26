@@ -4,11 +4,14 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
   workflow_dispatch:
 
 concurrency:
   group: utoo-azure-deploy
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   AZURE_WEBAPP_NAME: UTOO-dev
@@ -104,15 +107,14 @@ jobs:
             --name "${{ env.AZURE_WEBAPP_NAME }}"
 
       - name: Deploy zip to Azure Web App
-        timeout-minutes: 10
+        timeout-minutes: 20
         run: |
           az webapp deploy \
             --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
             --name "${{ env.AZURE_WEBAPP_NAME }}" \
             --src-path backend-deploy.zip \
             --type zip \
-            --clean true \
-            --restart false
+            --restart true
 
       - name: Start Azure Web App
         if: always()
@@ -120,3 +122,19 @@ jobs:
           az webapp start \
             --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
             --name "${{ env.AZURE_WEBAPP_NAME }}"
+
+      - name: Check production health
+        if: always()
+        run: |
+          for attempt in $(seq 1 18); do
+            status="$(curl -sS -o /tmp/utoo-health -w "%{http_code}" --max-time 10 "${{ env.ALLOWED_ORIGINS }}/health" || true)"
+            if [ "$status" = "200" ]; then
+              cat /tmp/utoo-health
+              exit 0
+            fi
+            echo "Health check attempt ${attempt} returned ${status}; waiting..."
+            sleep 10
+          done
+          echo "Health check did not return 200 after deployment."
+          cat /tmp/utoo-health || true
+          exit 1

@@ -140,13 +140,22 @@ GitHub Actions 工作流位于：
 .github/workflows/main_UTOO-dev.yml
 ```
 
+部署事故复盘和发布注意事项见：
+
+```text
+docs/azure-deployment-lessons.md
+```
+
 工作流会在推送到 `main` 时：
 
 1. 构建 `frontend`
 2. 把 `frontend/dist` 复制到 `backend/app/static`
 3. 校验后端依赖和 Python 编译
-4. 配置 Azure App Service 启动命令和 SQLite `DATABASE_URL`
-5. 将 `backend` 部署到 Azure App Service
+4. 将 Python 依赖打包进 `backend/.python_packages`
+5. 配置 Azure App Service 启动命令和 SQLite `DATABASE_URL`
+6. 将 `backend-deploy.zip` 部署到 Azure App Service
+
+注意：Azure App Service ZIP Deploy 不是热部署。部署阶段可能耗时数分钟，并可能短暂重启 Python 进程。开发和素材迭代应先走本地或 `dev` 分支验证，`main` 只用于确认后的生产发布。
 
 GitHub 仓库需要配置 Azure Deployment Center 自动生成的 OIDC secrets：
 
@@ -166,11 +175,14 @@ bash startup.sh
 
 ```text
 DATABASE_URL=sqlite+aiosqlite:////home/data/utoo.db
-SCM_DO_BUILD_DURING_DEPLOYMENT=true
+SCM_DO_BUILD_DURING_DEPLOYMENT=false
+ENABLE_ORYX_BUILD=false
 ALLOWED_ORIGINS=https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net
 ACCESS_TOKEN_EXPIRE_MINUTES=120
 REFRESH_TOKEN_EXPIRE_DAYS=30
 ```
+
+当前工作流由 GitHub Actions 预装依赖并打包部署，因此不要在 Azure Portal 里手动把 Oryx 构建开关改回开启，除非同步改回 workflow 和启动脚本。
 
 建议在 Azure App Service 的环境变量中手动设置一个生产用密钥：
 
@@ -190,3 +202,5 @@ DATABASE_URL=postgresql+asyncpg://<user>:<password>@<host>:5432/<database>?ssl=r
 curl https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net/health
 curl -i https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net/api/v1/posts
 ```
+
+如果线上出现 `403 This web app is stopped`，先在 Azure Portal 启动 App Service；如果出现 `503 Application Error`，先看 App Service 应用日志，不要连续盲目推送新提交。

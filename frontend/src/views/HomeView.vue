@@ -65,189 +65,239 @@
   </div>
 
   <div v-else class="mx-auto max-w-7xl px-4 py-8">
-    <div class="mb-6 flex flex-col gap-4 border-b border-slate-200 pb-5 md:flex-row md:items-end md:justify-between">
-      <div>
-        <p class="meta mb-1">{{ t('forumKicker') }}</p>
-        <h1 class="text-2xl font-semibold text-slate-950">{{ t('forumIndex') }}</h1>
+    <section
+      v-if="selectedSchool"
+      :class="[
+        'mb-5 overflow-hidden border',
+        isZhijiang
+          ? 'rounded-[8px] border-fuchsia-200 bg-[linear-gradient(135deg,#fff_0%,#fff7fb_45%,#ecfeff_100%)]'
+          : 'panel bg-white'
+      ]"
+    >
+      <div :class="['relative px-4 py-5 md:px-5', isZhijiang ? 'zhijiang-stage' : '']">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div class="min-w-0">
+            <p class="meta mb-2">{{ isZhijiang ? t('zhijiangKicker') : t('forumKicker') }}</p>
+            <div class="flex flex-wrap items-center gap-3">
+              <h1 class="text-2xl font-semibold text-slate-950 md:text-3xl">{{ schoolName(selectedSchool) }}</h1>
+              <span v-if="isZhijiang" class="border border-fuchsia-300 bg-white/80 px-2 py-1 text-xs font-semibold text-fuchsia-700">{{ t('publicSquare') }}</span>
+              <span v-else class="tag">{{ t('schoolBoard') }}</span>
+            </div>
+            <p class="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
+              {{ isZhijiang ? t('zhijiangSpecialIntro') : t('schoolIntro') }}
+            </p>
+            <div v-if="isZhijiang" class="mt-4 flex flex-wrap gap-2">
+              <span v-for="signal in zhijiangSignals" :key="signal" class="border border-fuchsia-200 bg-white/80 px-2 py-1 text-xs font-medium text-fuchsia-800">{{ t(signal) }}</span>
+            </div>
+          </div>
+          <div class="flex flex-col gap-2 sm:flex-row lg:shrink-0">
+            <button @click="showSchoolSwitcher = true" class="btn-secondary">{{ t('switchSchool') }}</button>
+            <button @click="showSchoolRequest = true" class="btn-secondary">{{ t('requestSchool') }}</button>
+            <button @click="openNewPost" class="btn-primary">{{ t('newPost') }}</button>
+          </div>
+        </div>
       </div>
-      <button @click="openNewPost" class="btn-primary w-full md:w-auto">
-        {{ t('newPost') }}
-      </button>
-    </div>
+    </section>
 
-    <div class="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
-      <aside class="space-y-4">
-        <section class="panel bg-white p-3">
-          <div class="mb-3 flex items-center justify-between border-b border-slate-200 pb-2">
-            <span class="text-sm font-semibold text-slate-950">{{ t('schools') }}</span>
-            <span class="meta">{{ schools.length }}</span>
-          </div>
-          <div class="max-h-[360px] space-y-1 overflow-y-auto pr-1">
-            <router-link
-              v-for="school in schools"
-              :key="school.slug"
-              :to="`/schools/${school.slug}`"
-              :class="[
-                'block border px-3 py-2 text-sm transition-colors',
-                selectedSchool?.slug === school.slug
-                  ? 'border-slate-950 bg-slate-950 text-white'
-                  : school.theme === 'zhijiang'
-                    ? 'border-fuchsia-200 bg-fuchsia-50/60 text-fuchsia-950 hover:border-fuchsia-300'
-                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-              ]"
-            >
-              <span class="font-medium">{{ schoolName(school) }}</span>
-              <span v-if="school.kind === 'virtual_public'" class="ml-2 text-[11px] opacity-75">{{ t('publicArea') }}</span>
-            </router-link>
-          </div>
-        </section>
+    <section v-if="isZhijiang" class="mb-5 grid gap-3 md:grid-cols-3">
+      <div v-for="card in zhijiangCards" :key="card.title" class="border border-fuchsia-200 bg-white px-4 py-3">
+        <p class="text-sm font-semibold text-slate-950">{{ t(card.title) }}</p>
+        <p class="mt-1 text-xs leading-5 text-slate-600">{{ t(card.body) }}</p>
+      </div>
+    </section>
 
-        <section class="panel bg-white p-3">
-          <div class="mb-3 border-b border-slate-200 pb-2">
-            <p class="text-sm font-semibold text-slate-950">{{ t('boards') }}</p>
-            <p class="meta mt-1">{{ selectedSchool ? schoolName(selectedSchool) : '-' }}</p>
-          </div>
-          <div class="space-y-1">
-            <router-link
-              v-if="selectedSchool"
-              :to="`/schools/${selectedSchool.slug}`"
-              :class="boardClass(null)"
-            >
-              {{ t('allBoards') }}
-            </router-link>
-            <template v-for="board in boards" :key="board.id">
-              <router-link
-                :to="boardPath(board)"
-                :class="boardClass(board)"
-              >
-                {{ board.name }}
-              </router-link>
-              <router-link
-                v-for="child in board.children || []"
-                :key="child.id"
-                :to="boardPath(child)"
-                :class="[boardClass(child), 'ml-4']"
-              >
-                {{ child.name }}
-              </router-link>
-            </template>
-          </div>
-        </section>
+    <section v-if="selectedSchool" class="panel mb-5 bg-white">
+      <div class="border-b border-slate-200 px-4 py-3">
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+          <router-link :to="`/schools/${selectedSchool.slug}`" class="link font-medium">{{ schoolName(selectedSchool) }}</router-link>
+          <span class="text-slate-400">/</span>
+          <span v-if="activeParentBoard" class="font-medium text-slate-800">{{ activeParentBoard.name }}</span>
+          <span v-else class="font-medium text-slate-800">{{ t('allBoards') }}</span>
+          <template v-if="activeChildBoard">
+            <span class="text-slate-400">/</span>
+            <span class="font-semibold text-slate-950">{{ activeChildBoard.name }}</span>
+            <span class="tag-accent">{{ t('subboard') }}</span>
+          </template>
+        </div>
+        <h2 v-if="activeChildBoard" class="mt-2 text-xl font-semibold text-slate-950">
+          {{ t('subboardTitle', { parent: activeParentBoard?.name || '', child: activeChildBoard.name }) }}
+        </h2>
+        <p v-else-if="activeParentBoard" class="mt-2 text-xl font-semibold text-slate-950">{{ activeParentBoard.name }}</p>
+      </div>
 
-        <section v-if="selectedSchool" class="panel bg-white p-3">
-          <p class="mb-2 text-sm font-semibold text-slate-950">{{ t('requestBoard') }}</p>
-          <form @submit.prevent="requestBoard" class="space-y-2">
-            <input v-model.trim="boardRequest.name" required class="input" :placeholder="t('boardNamePlaceholder')" />
-            <select v-model="boardRequest.parent_id" class="select">
-              <option :value="null">{{ t('topLevelBoard') }}</option>
-              <option v-for="board in requestableParents" :key="board.id" :value="board.id">{{ board.name }}</option>
-            </select>
-            <textarea v-model.trim="boardRequest.description" class="input h-20 resize-none" :placeholder="t('boardDescriptionPlaceholder')"></textarea>
-            <p v-if="boardRequestMessage" class="text-xs text-teal-700">{{ boardRequestMessage }}</p>
-            <p v-if="boardRequestError" class="text-xs text-red-600">{{ boardRequestError }}</p>
-            <button type="submit" :disabled="requestingBoard" class="btn-secondary w-full">{{ requestingBoard ? t('submitting') : t('submitBoardRequest') }}</button>
-          </form>
-        </section>
-      </aside>
+      <div class="border-b border-slate-200 px-3 py-3">
+        <div class="flex gap-2 overflow-x-auto pb-1">
+          <router-link :to="`/schools/${selectedSchool.slug}`" :class="topBoardClass(null)">
+            {{ t('allBoards') }}
+          </router-link>
+          <router-link v-for="board in boards" :key="board.id" :to="boardPath(board)" :class="topBoardClass(board)">
+            <span>{{ board.name }}</span>
+            <span v-if="board.children?.length" class="ml-2 text-[11px] opacity-70">{{ board.children.length }}</span>
+          </router-link>
+        </div>
+        <div v-if="childBoardsForActive.length" class="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+          <span class="meta">{{ t('subboardsOf', { board: activeParentBoard?.name || '' }) }}</span>
+          <router-link v-for="child in childBoardsForActive" :key="child.id" :to="boardPath(child)" :class="childBoardClass(child)">
+            {{ child.name }}
+          </router-link>
+        </div>
+      </div>
 
-      <main>
-        <section
-          v-if="selectedSchool"
+      <div class="grid gap-3 p-3 md:grid-cols-[1fr_auto] md:items-center">
+        <input
+          v-model.trim="searchText"
+          class="input"
+          :placeholder="t('searchPlaceholder')"
+          @keyup.enter="applySearch"
+        />
+        <button @click="applySearch" class="btn-secondary">{{ t('search') }}</button>
+      </div>
+
+      <div class="flex flex-wrap gap-1 border-t border-slate-200 px-3 py-3">
+        <button
+          v-for="item in filterCategories"
+          :key="item.value || 'all'"
+          @click="filterCategory = item.value"
           :class="[
-            'panel mb-5 overflow-hidden bg-white',
-            selectedSchool.theme === 'zhijiang' ? 'border-fuchsia-200 bg-gradient-to-br from-white via-fuchsia-50/40 to-cyan-50/50' : ''
+            'rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors',
+            filterCategory === item.value
+              ? 'border-slate-950 bg-slate-950 text-white'
+              : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-950'
           ]"
         >
-          <div class="border-b border-slate-200 px-4 py-4">
-            <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p class="meta mb-1">{{ selectedSchool.kind === 'virtual_public' ? t('publicArea') : t('schoolBoard') }}</p>
-                <h2 class="text-2xl font-semibold text-slate-950">{{ schoolName(selectedSchool) }}</h2>
-                <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                  {{ selectedSchool.theme === 'zhijiang' ? t('zhijiangIntro') : t('schoolIntro') }}
-                </p>
-              </div>
-              <div v-if="activeBoard" class="shrink-0 border border-slate-200 bg-white px-3 py-2 text-sm">
-                <span class="meta">{{ activeBoard.parent_id ? t('subboard') : t('board') }}</span>
-                <p class="font-semibold text-slate-950">{{ activeBoard.name }}</p>
-              </div>
-            </div>
-          </div>
+          {{ item.label }}
+        </button>
+      </div>
+    </section>
 
-          <div class="grid gap-3 p-3 md:grid-cols-[1fr_auto] md:items-center">
-            <input
-              v-model.trim="searchText"
-              class="input"
-              :placeholder="t('searchPlaceholder')"
-              @keyup.enter="applySearch"
-            />
-            <button @click="applySearch" class="btn-secondary">{{ t('search') }}</button>
-          </div>
+    <section v-if="selectedSchool" class="panel mb-5 bg-white p-4">
+      <details>
+        <summary class="cursor-pointer text-sm font-semibold text-slate-950">{{ t('requestBoard') }}</summary>
+        <form @submit.prevent="requestBoard" class="mt-3 grid gap-2 md:grid-cols-[1fr_180px_auto]">
+          <input v-model.trim="boardRequest.name" required class="input" :placeholder="t('boardNamePlaceholder')" />
+          <select v-model="boardRequest.parent_id" class="select">
+            <option :value="null">{{ t('topLevelBoard') }}</option>
+            <option v-for="board in requestableParents" :key="board.id" :value="board.id">{{ board.name }}</option>
+          </select>
+          <button type="submit" :disabled="requestingBoard" class="btn-secondary">{{ requestingBoard ? t('submitting') : t('submitBoardRequest') }}</button>
+          <textarea v-model.trim="boardRequest.description" class="input h-20 resize-none md:col-span-3" :placeholder="t('boardDescriptionPlaceholder')"></textarea>
+          <p v-if="boardRequestMessage" class="text-xs text-teal-700 md:col-span-3">{{ boardRequestMessage }}</p>
+          <p v-if="boardRequestError" class="text-xs text-red-600 md:col-span-3">{{ boardRequestError }}</p>
+        </form>
+      </details>
+    </section>
 
-          <div class="flex flex-wrap gap-1 border-t border-slate-200 px-3 py-3">
-            <button
-              v-for="item in filterCategories"
-              :key="item.value || 'all'"
-              @click="filterCategory = item.value"
-              :class="[
-                'rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors',
-                filterCategory === item.value
-                  ? 'border-slate-950 bg-slate-950 text-white'
-                  : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-950'
-              ]"
-            >
-              {{ item.label }}
-            </button>
-          </div>
-        </section>
-
-        <section v-if="announcements.length > 0" class="panel mb-5 overflow-hidden border-teal-700/40">
-          <div class="border-b border-slate-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-900">{{ t('pinnedAnnouncements') }}</div>
-          <article
-            v-for="post in announcements"
-            :key="post.id"
-            @click="$router.push(`/post/${post.id}`)"
-            class="cursor-pointer border-t border-slate-200 bg-white px-4 py-3 first:border-t-0 hover:bg-slate-50"
-          >
-            <div class="mb-1 flex flex-wrap items-center gap-2">
-              <span class="tag-accent">{{ categoryLabel('公告') }}</span>
-              <span v-if="post.board" class="tag">{{ post.board.name }}</span>
-              <span class="meta ml-auto">{{ formatDate(post.created_at) }}</span>
-            </div>
-            <h2 class="text-sm font-semibold text-slate-950">{{ post.title }}</h2>
-            <p class="line-clamp-1 text-sm text-slate-600">{{ stickerPlainText(post.content) }}</p>
-          </article>
-        </section>
-
-        <div v-if="loading" class="py-20 text-center text-sm text-slate-500">{{ t('loading') }}</div>
-        <div v-else-if="posts.length === 0" class="panel py-16 text-center text-sm text-slate-500">{{ t('noPosts') }}</div>
-        <div v-else class="panel divide-y divide-slate-200 overflow-hidden">
-          <article
-            v-for="post in posts"
-            :key="post.id"
-            @click="$router.push(`/post/${post.id}`)"
-            class="cursor-pointer bg-white px-4 py-4 transition-colors hover:bg-slate-50"
-          >
-            <div class="mb-2 flex flex-wrap items-center gap-2">
-              <span :class="post.is_pinned ? 'tag-accent' : 'tag'">{{ post.is_pinned ? t('pinned') : categoryLabel(post.category) }}</span>
-              <span v-if="post.school" class="tag">{{ schoolName(post.school) }}</span>
-              <span v-if="post.parent_board" class="tag">{{ post.parent_board.name }}</span>
-              <span v-if="post.board" class="tag">{{ post.board.name }}</span>
-              <span v-if="post.department_tag" class="tag">{{ post.department_tag }}</span>
-              <span class="meta ml-auto">{{ formatDate(post.created_at) }}</span>
-            </div>
-            <h2 class="mb-1 text-base font-semibold leading-snug text-slate-950">{{ post.title }}</h2>
-            <p class="line-clamp-2 text-sm leading-6 text-slate-600">{{ stickerPlainText(post.content) }}</p>
-            <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-              <span class="inline-flex items-center gap-2">
-                <span>{{ post.author.display_name }}</span>
-                <span v-if="post.author.source === 'agent'" class="tag-accent">{{ sourceLabel(post.author.source) }}</span>
-              </span>
-              <span>{{ t('commentsCount', { count: post.comment_count }) }}</span>
-            </div>
-          </article>
+    <section v-if="announcements.length > 0" class="panel mb-5 overflow-hidden border-teal-700/40">
+      <div class="border-b border-slate-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-900">{{ t('pinnedAnnouncements') }}</div>
+      <article
+        v-for="post in announcements"
+        :key="post.id"
+        @click="openPost(post.id)"
+        class="cursor-pointer border-t border-slate-200 bg-white px-4 py-3 first:border-t-0 hover:bg-slate-50"
+      >
+        <div class="mb-1 flex flex-wrap items-center gap-2">
+          <span class="tag-accent">{{ categoryLabel('公告') }}</span>
+          <span v-if="post.board" class="tag">{{ postBoardLabel(post) }}</span>
+          <span class="meta ml-auto">{{ formatDate(post.created_at) }}</span>
         </div>
-      </main>
+        <h2 class="text-sm font-semibold text-slate-950">{{ post.title }}</h2>
+        <p class="line-clamp-1 text-sm text-slate-600">{{ stickerPlainText(post.content) }}</p>
+      </article>
+    </section>
+
+    <div v-if="loading" class="py-20 text-center text-sm text-slate-500">{{ t('loading') }}</div>
+    <div v-else-if="posts.length === 0" class="panel py-16 text-center text-sm text-slate-500">{{ t('noPosts') }}</div>
+    <div v-else class="panel divide-y divide-slate-200 overflow-hidden">
+      <article
+        v-for="post in posts"
+        :key="post.id"
+        @click="openPost(post.id)"
+        class="cursor-pointer bg-white px-4 py-4 transition-colors hover:bg-slate-50"
+      >
+        <div class="mb-2 flex flex-wrap items-center gap-2">
+          <span :class="post.is_pinned ? 'tag-accent' : 'tag'">{{ post.is_pinned ? t('pinned') : categoryLabel(post.category) }}</span>
+          <span v-if="post.school" class="tag">{{ schoolName(post.school) }}</span>
+          <span v-if="post.board" class="tag">{{ postBoardLabel(post) }}</span>
+          <span v-if="post.parent_board" class="tag-accent">{{ t('subboard') }}</span>
+          <span v-if="post.department_tag" class="tag">{{ post.department_tag }}</span>
+          <span class="meta ml-auto">{{ formatDate(post.created_at) }}</span>
+        </div>
+        <h2 class="mb-1 text-base font-semibold leading-snug text-slate-950">{{ post.title }}</h2>
+        <p class="line-clamp-2 text-sm leading-6 text-slate-600">{{ stickerPlainText(post.content) }}</p>
+        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+          <span class="inline-flex items-center gap-2">
+            <span>{{ post.author.display_name }}</span>
+            <span v-if="post.author.source === 'agent'" class="tag-accent">{{ sourceLabel(post.author.source) }}</span>
+          </span>
+          <span>{{ t('commentsCount', { count: post.comment_count }) }}</span>
+        </div>
+      </article>
+    </div>
+
+    <div v-if="selectedPostId" class="fixed inset-0 z-50 bg-slate-950/35">
+      <div class="absolute inset-y-0 right-0 w-full bg-slate-50 shadow-xl md:w-[min(760px,92vw)]">
+        <PostDetailPanel
+          :post-id="selectedPostId"
+          embedded
+          @close="closePost"
+          @deleted="handlePostDeleted"
+          @changed="loadPosts"
+        />
+      </div>
+    </div>
+
+    <div v-if="showSchoolSwitcher" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 px-4">
+      <div class="panel w-full max-w-2xl bg-white p-5">
+        <div class="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
+          <div>
+            <h2 class="text-base font-semibold text-slate-950">{{ t('switchSchool') }}</h2>
+            <p class="meta mt-1">{{ t('switchSchoolHint') }}</p>
+          </div>
+          <button @click="showSchoolSwitcher = false" class="text-sm text-slate-500 hover:text-slate-950">{{ t('close') }}</button>
+        </div>
+        <input v-model.trim="schoolSearch" class="input mb-3" :placeholder="t('schoolSearchPlaceholder')" />
+        <div class="max-h-[420px] divide-y divide-slate-200 overflow-y-auto border border-slate-200">
+          <router-link
+            v-for="school in filteredSchools"
+            :key="school.slug"
+            :to="`/schools/${school.slug}`"
+            @click="showSchoolSwitcher = false"
+            class="block bg-white px-3 py-2 text-sm hover:bg-slate-50"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <span class="font-medium text-slate-950">{{ schoolName(school) }}</span>
+              <span v-if="school.kind === 'virtual_public'" class="tag-accent">{{ t('publicArea') }}</span>
+            </div>
+            <p class="meta mt-1">{{ school.name_en }}</p>
+          </router-link>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showSchoolRequest" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 px-4">
+      <div class="panel w-full max-w-xl bg-white p-5">
+        <div class="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
+          <div>
+            <h2 class="text-base font-semibold text-slate-950">{{ t('requestSchool') }}</h2>
+            <p class="meta mt-1">{{ t('requestSchoolHint') }}</p>
+          </div>
+          <button @click="showSchoolRequest = false" class="text-sm text-slate-500 hover:text-slate-950">{{ t('close') }}</button>
+        </div>
+        <form @submit.prevent="requestSchool" class="space-y-3">
+          <input v-model.trim="schoolRequest.name_zh" required class="input" :placeholder="t('schoolNameZhPlaceholder')" />
+          <input v-model.trim="schoolRequest.name_en" class="input" :placeholder="t('schoolNameEnPlaceholder')" />
+          <input v-model.trim="schoolRequest.name_ja" class="input" :placeholder="t('schoolNameJaPlaceholder')" />
+          <input v-model.trim="schoolRequest.aliases" class="input" :placeholder="t('schoolAliasesPlaceholder')" />
+          <input v-model.trim="schoolRequest.website" class="input" :placeholder="t('schoolWebsitePlaceholder')" />
+          <textarea v-model.trim="schoolRequest.description" class="input h-24 resize-none" :placeholder="t('schoolRequestDescriptionPlaceholder')"></textarea>
+          <p v-if="schoolRequestMessage" class="text-sm text-teal-700">{{ schoolRequestMessage }}</p>
+          <p v-if="schoolRequestError" class="text-sm text-red-600">{{ schoolRequestError }}</p>
+          <div class="flex justify-end gap-3">
+            <button type="button" @click="showSchoolRequest = false" class="btn-secondary">{{ t('cancel') }}</button>
+            <button type="submit" :disabled="requestingSchool" class="btn-primary">{{ requestingSchool ? t('submitting') : t('submitSchoolRequest') }}</button>
+          </div>
+        </form>
+      </div>
     </div>
 
     <div v-if="showNewPost" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
@@ -297,11 +347,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n } from '@/i18n'
 import StickerPicker from '@/components/StickerPicker.vue'
+import PostDetailPanel from '@/components/PostDetailPanel.vue'
 import { stickerPlainText } from '@/stickers/yutoko'
 
 type School = {
@@ -326,6 +377,7 @@ type Board = {
 }
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const { t, categoryLabel, sourceLabel, formatDate, currentLocale } = useI18n()
 const posts = ref<any[]>([])
@@ -342,6 +394,12 @@ const postError = ref('')
 const boardRequestMessage = ref('')
 const boardRequestError = ref('')
 const requestingBoard = ref(false)
+const showSchoolSwitcher = ref(false)
+const showSchoolRequest = ref(false)
+const schoolSearch = ref('')
+const requestingSchool = ref(false)
+const schoolRequestMessage = ref('')
+const schoolRequestError = ref('')
 const newPostContentInput = ref<HTMLTextAreaElement | null>(null)
 const newPostContentCursor = ref({ start: 0, end: 0 })
 const categories = ['课程', '研究室', '生活', '租房', '就职', '闲聊']
@@ -357,6 +415,12 @@ const schoolPreview = [
   { title: 'homeSchoolPreviewBoardsTitle', body: 'homeSchoolPreviewBoardsBody' },
   { title: 'homeSchoolPreviewAgentTitle', body: 'homeSchoolPreviewAgentBody' }
 ]
+const zhijiangSignals = ['zhijiangSignalCheer', 'zhijiangSignalBroadcast', 'zhijiangSignalDorm', 'zhijiangSignalHelp']
+const zhijiangCards = [
+  { title: 'zhijiangCardSquareTitle', body: 'zhijiangCardSquareBody' },
+  { title: 'zhijiangCardBroadcastTitle', body: 'zhijiangCardBroadcastBody' },
+  { title: 'zhijiangCardSupportTitle', body: 'zhijiangCardSupportBody' }
+]
 const filterCategories = computed(() => [
   { label: t('categoryAll'), value: null },
   { label: categoryLabel('公告'), value: '公告' },
@@ -371,9 +435,31 @@ const selectedBoardSlug = computed(() => typeof route.params.boardSlug === 'stri
 const selectedSchool = computed(() => schools.value.find((school) => school.slug === selectedSchoolSlug.value) || null)
 const flatBoards = computed(() => boards.value.flatMap((board) => [board, ...(board.children || [])]))
 const activeBoard = computed(() => flatBoards.value.find((board) => board.slug === selectedBoardSlug.value) || null)
+const activeParentBoard = computed(() => {
+  if (!activeBoard.value) return null
+  if (!activeBoard.value.parent_id) return activeBoard.value
+  return boards.value.find((board) => board.id === activeBoard.value?.parent_id) || null
+})
+const activeChildBoard = computed(() => activeBoard.value?.parent_id ? activeBoard.value : null)
+const childBoardsForActive = computed(() => activeParentBoard.value?.children || [])
+const isZhijiang = computed(() => selectedSchool.value?.slug === 'zhijiang-university' || selectedSchool.value?.theme === 'zhijiang')
+const selectedPostId = computed(() => typeof route.query.post === 'string' ? route.query.post : '')
+const filteredSchools = computed(() => {
+  const query = schoolSearch.value.trim().toLowerCase()
+  if (!query) {
+    const current = selectedSchool.value ? [selectedSchool.value] : []
+    const publicSchool = schools.value.find((school) => school.slug === 'zhijiang-university')
+    const rest = schools.value.filter((school) => school.id !== selectedSchool.value?.id && school.id !== publicSchool?.id)
+    return [...current, ...(publicSchool && publicSchool.id !== selectedSchool.value?.id ? [publicSchool] : []), ...rest].slice(0, 30)
+  }
+  return schools.value.filter((school) => {
+    return [school.name_zh, school.name_en, school.name_ja, school.slug].some((value) => value?.toLowerCase().includes(query))
+  }).slice(0, 50)
+})
 const requestableParents = computed(() => boards.value.filter((board) => board.slug !== 'notice'))
 const writableBoards = computed(() => flatBoards.value.filter((board) => auth.isAdmin || board.slug !== 'notice'))
 const boardRequest = ref<{ name: string; description: string; parent_id: number | null }>({ name: '', description: '', parent_id: null })
+const schoolRequest = ref({ name_zh: '', name_en: '', name_ja: '', aliases: '', website: '', description: '' })
 const newPost = ref({ title: '', content: '', department_tag: '', category: '闲聊', is_anonymous: false, board_id: null as number | null })
 
 function schoolName(school: School | null | undefined) {
@@ -395,9 +481,46 @@ function boardClass(board: Board | null) {
   ]
 }
 
+function topBoardClass(board: Board | null) {
+  const active = board ? activeParentBoard.value?.id === board.id : !activeBoard.value
+  return [
+    'inline-flex shrink-0 items-center border px-3 py-2 text-sm font-medium transition-colors',
+    active ? 'border-slate-950 bg-slate-950 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+  ]
+}
+
+function childBoardClass(board: Board) {
+  const active = activeChildBoard.value?.id === board.id
+  return [
+    'inline-flex items-center border px-3 py-1.5 text-xs font-medium transition-colors',
+    active ? 'border-teal-700 bg-teal-50 text-teal-800' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+  ]
+}
+
 function boardPathLabel(board: Board) {
   const parent = boards.value.find((item) => item.id === board.parent_id)
   return parent ? `${parent.name} / ${board.name}` : board.name
+}
+
+function postBoardLabel(post: any) {
+  if (post.parent_board && post.board) return `${post.parent_board.name} > ${post.board.name}`
+  return post.board?.name || ''
+}
+
+function openPost(id: number) {
+  router.push({ path: route.path, query: { ...route.query, post: String(id), mascotPose: 'post' } })
+}
+
+function closePost() {
+  const next = { ...route.query }
+  delete next.post
+  delete next.mascotPose
+  router.push({ path: route.path, query: next })
+}
+
+async function handlePostDeleted() {
+  await loadPosts()
+  await loadAnnouncements()
 }
 
 function rememberNewPostCursor() {
@@ -528,6 +651,28 @@ async function requestBoard() {
     boardRequestError.value = e.response?.data?.detail || t('boardRequestFailed')
   } finally {
     requestingBoard.value = false
+  }
+}
+
+async function requestSchool() {
+  requestingSchool.value = true
+  schoolRequestMessage.value = ''
+  schoolRequestError.value = ''
+  try {
+    await api.post('/school-requests', {
+      name_zh: schoolRequest.value.name_zh,
+      name_en: schoolRequest.value.name_en || null,
+      name_ja: schoolRequest.value.name_ja || null,
+      aliases: schoolRequest.value.aliases || null,
+      website: schoolRequest.value.website || null,
+      description: schoolRequest.value.description || null
+    })
+    schoolRequest.value = { name_zh: '', name_en: '', name_ja: '', aliases: '', website: '', description: '' }
+    schoolRequestMessage.value = t('schoolRequestSubmitted')
+  } catch (e: any) {
+    schoolRequestError.value = e.response?.data?.detail || t('schoolRequestFailed')
+  } finally {
+    requestingSchool.value = false
   }
 }
 

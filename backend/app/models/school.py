@@ -61,3 +61,29 @@ class Board(Base):
 
     school = relationship("School", back_populates="boards", lazy="noload")
     parent = relationship("Board", remote_side=[id], lazy="noload")
+
+
+class SchoolRequest(Base):
+    __tablename__ = "school_requests"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    requested_by: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    name_zh: Mapped[str] = mapped_column(String(200), nullable=False)
+    name_en: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    name_ja: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    aliases: Mapped[str | None] = mapped_column(Text, nullable=True)
+    website: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    created_school_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("schools.id"), nullable=True)
+    reviewed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    requester = relationship("User", foreign_keys=[requested_by], lazy="noload")
+    created_school = relationship("School", foreign_keys=[created_school_id], lazy="noload")

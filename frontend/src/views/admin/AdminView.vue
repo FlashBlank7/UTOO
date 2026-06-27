@@ -210,7 +210,10 @@
           </thead>
           <tbody>
             <tr v-for="board in boardRequests" :key="board.id" class="table-row">
-              <td class="px-4 py-3 font-medium text-slate-900">{{ board.name }}</td>
+              <td class="px-4 py-3 font-medium text-slate-900">
+                <span v-if="board.parent_name" class="tag-accent mr-2">{{ t('subboard') }}</span>
+                {{ board.parent_name ? `${board.parent_name} / ${board.name}` : board.name }}
+              </td>
               <td class="px-4 py-3 text-slate-700">{{ schoolName(board.school) }}</td>
               <td class="px-4 py-3 text-slate-600">{{ board.description || '-' }}</td>
               <td class="px-4 py-3 text-center"><span class="tag">{{ boardStatusLabel(board.status) }}</span></td>
@@ -224,6 +227,56 @@
           </tbody>
         </table>
         <div v-if="boardRequests.length === 0" class="py-8 text-center text-sm text-slate-500">{{ t('noBoardRequests') }}</div>
+      </div>
+    </template>
+
+    <template v-if="activeTab === 'schools'">
+      <div class="mb-4 flex gap-2">
+        <button @click="schoolRequestStatus = 'pending'; loadSchoolRequests()" :class="schoolRequestStatus === 'pending' ? 'btn-primary' : 'btn-secondary'">{{ t('pending') }}</button>
+        <button @click="schoolRequestStatus = 'approved'; loadSchoolRequests()" :class="schoolRequestStatus === 'approved' ? 'btn-primary' : 'btn-secondary'">{{ t('approved') }}</button>
+        <button @click="schoolRequestStatus = 'rejected'; loadSchoolRequests()" :class="schoolRequestStatus === 'rejected' ? 'btn-primary' : 'btn-secondary'">{{ t('rejected') }}</button>
+      </div>
+      <div class="panel overflow-x-auto">
+        <table class="w-full min-w-[980px] text-sm">
+          <thead class="table-head">
+            <tr>
+              <th class="px-4 py-3 text-left">{{ t('name') }}</th>
+              <th class="px-4 py-3 text-left">EN / JA</th>
+              <th class="px-4 py-3 text-left">{{ t('aliases') }}</th>
+              <th class="px-4 py-3 text-left">{{ t('details') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('status') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('createdAt') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('action') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="request in schoolRequests" :key="request.id" class="table-row">
+              <td class="px-4 py-3 font-medium text-slate-900">
+                {{ request.name_zh }}
+                <p v-if="request.created_school" class="meta mt-1">{{ request.created_school.slug }}</p>
+              </td>
+              <td class="px-4 py-3 text-slate-700">
+                <p>{{ request.name_en || '-' }}</p>
+                <p>{{ request.name_ja || '-' }}</p>
+              </td>
+              <td class="px-4 py-3 text-slate-600">{{ request.aliases || '-' }}</td>
+              <td class="px-4 py-3 text-slate-600">
+                <a v-if="request.website" :href="request.website" target="_blank" rel="noreferrer" class="link">{{ request.website }}</a>
+                <p class="mt-1 line-clamp-2">{{ request.description || '-' }}</p>
+              </td>
+              <td class="px-4 py-3 text-center"><span class="tag">{{ boardStatusLabel(request.status) }}</span></td>
+              <td class="px-4 py-3 text-center text-slate-500">{{ formatDate(request.created_at) }}</td>
+              <td class="px-4 py-3 text-center">
+                <template v-if="request.status === 'pending'">
+                  <button @click="patchSchoolRequest(request, 'approved')" class="link text-xs">{{ t('approve') }}</button>
+                  <button @click="patchSchoolRequest(request, 'rejected')" class="ml-3 text-xs text-red-600 hover:underline">{{ t('reject') }}</button>
+                </template>
+                <span v-else class="text-xs text-slate-500">-</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="schoolRequests.length === 0" class="py-8 text-center text-sm text-slate-500">{{ t('noSchoolRequests') }}</div>
       </div>
     </template>
 
@@ -381,6 +434,7 @@ const tabs = [
   { key: 'posts', labelKey: 'adminTabPosts' },
   { key: 'announcements', labelKey: 'adminTabAnnouncements' },
   { key: 'boards', labelKey: 'adminTabBoards' },
+  { key: 'schools', labelKey: 'adminTabSchools' },
   { key: 'reports', labelKey: 'adminTabReports' },
   { key: 'logs', labelKey: 'adminTabLogs' },
   { key: 'agents', labelKey: 'adminTabAgents' }
@@ -392,6 +446,7 @@ const posts = ref<any[]>([])
 const announcements = ref<any[]>([])
 const schools = ref<any[]>([])
 const boardRequests = ref<any[]>([])
+const schoolRequests = ref<any[]>([])
 const reports = ref<any[]>([])
 const moderationLogs = ref<any[]>([])
 const agents = ref<any[]>([])
@@ -411,6 +466,7 @@ const agentError = ref('')
 const revealedAgentKey = ref('')
 const reportStatus = ref('pending')
 const boardStatus = ref('pending')
+const schoolRequestStatus = ref('pending')
 const announcement = ref({ title: '', content: '', school_id: null as number | null })
 const creatingAnnouncement = ref(false)
 const announcementError = ref('')
@@ -447,6 +503,11 @@ async function loadAnnouncements() {
 async function loadBoardRequests() {
   const { data } = await api.get('/admin/board-requests', { params: { status: boardStatus.value } })
   boardRequests.value = data
+}
+
+async function loadSchoolRequests() {
+  const { data } = await api.get('/admin/school-requests', { params: { status: schoolRequestStatus.value } })
+  schoolRequests.value = data
 }
 
 async function loadReports() {
@@ -566,6 +627,12 @@ async function patchBoard(board: any, status: string) {
   await loadBoardRequests()
 }
 
+async function patchSchoolRequest(request: any, status: string) {
+  await api.patch(`/admin/school-requests/${request.id}`, { status })
+  await loadSchoolRequests()
+  if (status === 'approved') await loadSchools()
+}
+
 async function handleReport(report: any, action: string) {
   const payload: Record<string, any> = { action, resolution: action }
   if (action === 'mute') payload.mute_days = 1
@@ -641,6 +708,7 @@ watch(activeTab, (tab) => {
   if (tab === 'posts') loadPosts()
   if (tab === 'announcements') { loadSchools(); loadAnnouncements() }
   if (tab === 'boards') loadBoardRequests()
+  if (tab === 'schools') loadSchoolRequests()
   if (tab === 'reports') loadReports()
   if (tab === 'logs') loadModerationLogs()
   if (tab === 'agents') loadAgents()

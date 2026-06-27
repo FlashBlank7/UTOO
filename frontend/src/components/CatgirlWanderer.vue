@@ -253,12 +253,14 @@ const positionStyle = computed(() => ({
 }))
 
 function canAppear() {
-  return route.path === '/' || route.path.startsWith('/post/') || route.path === '/login' || route.path === '/register'
+  return route.path === '/' || route.path.startsWith('/schools/') || route.path.startsWith('/post/') || route.path === '/login' || route.path === '/register'
 }
 
 function routeContext() {
   if (route.path === '/') return 'home'
+  if (typeof route.query.post === 'string') return 'post'
   if (route.path.startsWith('/post/')) return 'post'
+  if (route.path.startsWith('/schools/')) return 'home'
   if (route.path === '/login') return 'login'
   if (route.path === '/register') return 'register'
   return 'home'
@@ -268,6 +270,7 @@ function readMascotPose() {
   const params = new URLSearchParams(window.location.search)
   const raw = params.get('mascotPose')
   if (raw === 'home' || raw === 'post' || raw === 'auth') return raw
+  if (typeof route.query.post === 'string') return 'post'
   if (route.path.startsWith('/post/')) return 'post'
   if (route.path === '/login' || route.path === '/register') return 'auth'
   return 'home'

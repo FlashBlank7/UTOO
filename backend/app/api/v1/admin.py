@@ -11,7 +11,7 @@ from app.models.post import Post
 from app.models.agent import Agent
 from app.models.comment import Comment
 from app.models.report import ModerationLog, Report
-from app.models.school import Board, School
+from app.models.school import Board, School, SchoolRequest
 from app.schemas.admin import (
     AgentOut,
     AgentWithKeyOut,
@@ -26,7 +26,7 @@ from app.schemas.admin import (
 )
 from app.schemas.user import UserOut
 from app.schemas.post import PostOut, AuthorInfo
-from app.schemas.school import BoardOut, BoardPatchRequest, SchoolBrief
+from app.schemas.school import BoardOut, BoardPatchRequest, SchoolBrief, SchoolRequestOut, SchoolRequestPatch
 from app.schemas.report import (
     ModerationLogOut,
     PatchReportRequest,
@@ -46,7 +46,20 @@ from app.core.moderation import (
     set_comment_visibility,
     set_post_visibility,
 )
-from app.core.schools import BOARD_STATUS_APPROVED, BOARD_STATUS_HIDDEN, BOARD_STATUS_PENDING, BOARD_STATUS_REJECTED, DEFAULT_SCHOOL_SLUG
+from app.core.schools import (
+    BOARD_STATUS_APPROVED,
+    BOARD_STATUS_HIDDEN,
+    BOARD_STATUS_PENDING,
+    BOARD_STATUS_REJECTED,
+    DEFAULT_SCHOOL_SLUG,
+    SCHOOL_REQUEST_APPROVED,
+    SCHOOL_REQUEST_PENDING,
+    SCHOOL_REQUEST_REJECTED,
+    add_school_alias,
+    create_default_boards,
+    parse_aliases,
+    unique_school_slug,
+)
 from app.dependencies import get_current_admin
 
 router = APIRouter()
@@ -91,7 +104,7 @@ def _school_brief(school: School | None) -> SchoolBrief | None:
     )
 
 
-def _board_out(board: Board, school: School | None = None) -> BoardOut:
+def _board_out(board: Board, school: School | None = None, parent_name: str | None = None) -> BoardOut:
     return BoardOut(
         id=board.id,
         school_id=board.school_id,
@@ -105,6 +118,27 @@ def _board_out(board: Board, school: School | None = None) -> BoardOut:
         created_at=board.created_at,
         updated_at=board.updated_at,
         school=_school_brief(school),
+        parent_name=parent_name,
+    )
+
+
+def _school_request_out(request: SchoolRequest, created_school: School | None = None) -> SchoolRequestOut:
+    return SchoolRequestOut(
+        id=request.id,
+        requested_by=request.requested_by,
+        name_zh=request.name_zh,
+        name_en=request.name_en,
+        name_ja=request.name_ja,
+        aliases=request.aliases,
+        website=request.website,
+        description=request.description,
+        status=request.status,
+        created_school=_school_brief(created_school),
+        created_school_id=request.created_school_id,
+        reviewed_by=request.reviewed_by,
+        reviewed_at=request.reviewed_at,
+        created_at=request.created_at,
+        updated_at=request.updated_at,
     )
 
 
@@ -326,7 +360,12 @@ async def list_board_requests(
     school_ids = list({board.school_id for board in boards})
     school_result = await db.execute(select(School).where(School.id.in_(school_ids)))
     schools = {school.id: school for school in school_result.scalars().all()}
-    return [_board_out(board, schools.get(board.school_id)) for board in boards]
+    parent_ids = list({board.parent_id for board in boards if board.parent_id is not None})
+    parents = {}
+    if parent_ids:
+        parent_result = await db.execute(select(Board).where(Board.id.in_(parent_ids)))
+        parents = {board.id: board for board in parent_result.scalars().all()}
+    return [_board_out(board, schools.get(board.school_id), parents.get(board.parent_id).name if board.parent_id in parents else None) for board in boards]
 
 
 @router.patch("/boards/{board_id}", response_model=BoardOut)
@@ -359,7 +398,95 @@ async def patch_board(
     await db.commit()
     await db.refresh(board)
     school_result = await db.execute(select(School).where(School.id == board.school_id))
-    return _board_out(board, school_result.scalar_one_or_none())
+    parent_name = None
+    if board.parent_id:
+        parent_result = await db.execute(select(Board).where(Board.id == board.parent_id))
+        parent = parent_result.scalar_one_or_none()
+        parent_name = parent.name if parent else None
+    return _board_out(board, school_result.scalar_one_or_none(), parent_name)
+
+
+@router.get("/school-requests", response_model=list[SchoolRequestOut])
+async def list_school_requests(
+    status_filter: str | None = Query(SCHOOL_REQUEST_PENDING, alias="status"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    stmt = select(SchoolRequest).order_by(SchoolRequest.created_at.desc())
+    if status_filter:
+        stmt = stmt.where(SchoolRequest.status == status_filter)
+    result = await db.execute(stmt)
+    requests = result.scalars().all()
+    if not requests:
+        return []
+    school_ids = list({request.created_school_id for request in requests if request.created_school_id is not None})
+    schools = {}
+    if school_ids:
+        school_result = await db.execute(select(School).where(School.id.in_(school_ids)))
+        schools = {school.id: school for school in school_result.scalars().all()}
+    return [_school_request_out(request, schools.get(request.created_school_id)) for request in requests]
+
+
+@router.patch("/school-requests/{request_id}", response_model=SchoolRequestOut)
+async def patch_school_request(
+    request_id: int,
+    body: SchoolRequestPatch,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    if body.status not in {SCHOOL_REQUEST_APPROVED, SCHOOL_REQUEST_REJECTED}:
+        raise HTTPException(status_code=400, detail="Invalid school request status")
+    result = await db.execute(select(SchoolRequest).where(SchoolRequest.id == request_id))
+    request = result.scalar_one_or_none()
+    if not request:
+        raise HTTPException(status_code=404, detail="School request not found")
+    if request.status != SCHOOL_REQUEST_PENDING:
+        raise HTTPException(status_code=400, detail="School request already reviewed")
+
+    created_school = None
+    request.status = body.status
+    request.reviewed_by = current_user.id
+    request.reviewed_at = datetime.now(timezone.utc)
+
+    if body.status == SCHOOL_REQUEST_APPROVED:
+        primary_name = request.name_en or request.name_zh
+        slug = await unique_school_slug(db, primary_name)
+        school = School(
+            slug=slug,
+            name_zh=request.name_zh,
+            name_en=request.name_en or request.name_zh,
+            name_ja=request.name_ja or request.name_zh,
+            country="Japan",
+            kind="real",
+            rank_source=None,
+            rank_label=None,
+            rank_order=None,
+            theme="standard",
+            is_active=True,
+        )
+        db.add(school)
+        await db.flush()
+        for alias, locale in [
+            (request.name_zh, "zh"),
+            (request.name_en or "", "en"),
+            (request.name_ja or "", "ja"),
+        ]:
+            await add_school_alias(db, school, alias, locale)
+        for alias in parse_aliases(request.aliases):
+            await add_school_alias(db, school, alias)
+        await create_default_boards(db, school)
+        request.created_school_id = school.id
+        created_school = school
+        add_moderation_log(db, current_user, "school_request", request.id, "approve", school.slug)
+    else:
+        add_moderation_log(db, current_user, "school_request", request.id, "reject", None)
+
+    await db.commit()
+    await db.refresh(request)
+    if request.created_school_id and not created_school:
+        school_result = await db.execute(select(School).where(School.id == request.created_school_id))
+        created_school = school_result.scalar_one_or_none()
+    return _school_request_out(request, created_school)
 
 
 @router.get("/agents", response_model=list[AgentOut])

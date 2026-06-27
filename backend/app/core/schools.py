@@ -11,6 +11,9 @@ BOARD_STATUS_APPROVED = "approved"
 BOARD_STATUS_PENDING = "pending"
 BOARD_STATUS_REJECTED = "rejected"
 BOARD_STATUS_HIDDEN = "hidden"
+SCHOOL_REQUEST_PENDING = "pending"
+SCHOOL_REQUEST_APPROVED = "approved"
+SCHOOL_REQUEST_REJECTED = "rejected"
 
 REAL_SCHOOL_BOARDS = [
     ("notice", "公告", "学校公告、规则和简介", 10),
@@ -63,6 +66,54 @@ def slugify(value: str, fallback_prefix: str = "item") -> str:
         return normalized[:100]
     digest = hashlib.sha1(value.encode("utf-8")).hexdigest()[:10]
     return f"{fallback_prefix}-{digest}"
+
+
+async def unique_school_slug(db: AsyncSession, value: str) -> str:
+    base = slugify(value, "school")
+    slug = base
+    index = 2
+    while True:
+        result = await db.execute(select(School.id).where(School.slug == slug))
+        if not result.scalar_one_or_none():
+            return slug
+        slug = f"{base[:94]}-{index}"
+        index += 1
+
+
+async def add_school_alias(db: AsyncSession, school: School, alias: str, locale: str | None = None) -> None:
+    value = alias.strip()
+    if not value:
+        return
+    normalized = normalize_school_alias(value)
+    exists = await db.execute(select(SchoolAlias.id).where(SchoolAlias.alias_normalized == normalized))
+    if exists.scalar_one_or_none():
+        return
+    db.add(SchoolAlias(school_id=school.id, alias=value, alias_normalized=normalized, locale=locale))
+
+
+def parse_aliases(value: str | None) -> list[str]:
+    if not value:
+        return []
+    parts = re.split(r"[,，、\n]+", value)
+    return [part.strip() for part in parts if part.strip()]
+
+
+async def create_default_boards(db: AsyncSession, school: School) -> None:
+    existing = await db.execute(select(Board.id).where(Board.school_id == school.id))
+    if existing.first():
+        return
+    for slug, name, description, sort_order in REAL_SCHOOL_BOARDS:
+        db.add(
+            Board(
+                school_id=school.id,
+                parent_id=None,
+                slug=slug,
+                name=name,
+                description=description,
+                status=BOARD_STATUS_APPROVED,
+                sort_order=sort_order,
+            )
+        )
 
 
 async def get_default_school(db: AsyncSession) -> School:

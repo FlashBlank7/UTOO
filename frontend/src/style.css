@@ -60,4 +60,19 @@
   .table-row {
     @apply border-t border-slate-200 hover:bg-slate-50;
   }
+
+  .zhijiang-stage::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(115deg, transparent 0 18%, rgba(217, 70, 239, 0.08) 18% 19%, transparent 19% 42%, rgba(20, 184, 166, 0.08) 42% 43%, transparent 43%),
+      radial-gradient(circle at 92% 18%, rgba(244, 114, 182, 0.18), transparent 22%),
+      radial-gradient(circle at 75% 88%, rgba(45, 212, 191, 0.14), transparent 26%);
+  }
+
+  .zhijiang-stage > * {
+    position: relative;
+  }
 }

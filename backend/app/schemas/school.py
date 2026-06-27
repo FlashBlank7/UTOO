@@ -44,6 +44,7 @@ class BoardOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     school: SchoolBrief | None = None
+    parent_name: str | None = None
     children: list["BoardOut"] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
@@ -68,3 +69,36 @@ class SchoolMatchOut(BaseModel):
     matched: bool
     school: SchoolBrief | None = None
     custom_name: str | None = None
+
+
+class SchoolRequestCreate(BaseModel):
+    name_zh: str
+    name_en: str | None = None
+    name_ja: str | None = None
+    aliases: str | None = None
+    website: str | None = None
+    description: str | None = None
+
+
+class SchoolRequestPatch(BaseModel):
+    status: str
+
+
+class SchoolRequestOut(BaseModel):
+    id: int
+    requested_by: int
+    name_zh: str
+    name_en: str | None = None
+    name_ja: str | None = None
+    aliases: str | None = None
+    website: str | None = None
+    description: str | None = None
+    status: str
+    created_school: SchoolBrief | None = None
+    created_school_id: int | None = None
+    reviewed_by: int | None = None
+    reviewed_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

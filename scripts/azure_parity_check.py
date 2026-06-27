@@ -29,9 +29,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 STATIC_INDEX = BACKEND / "app" / "static" / "index.html"
-EXPECTED_MIN_SCHOOLS = 51
-EXPECTED_MIN_BOARDS = 357
-EXPECTED_ALEMBIC_VERSION = "0009"
+EXPECTED_MIN_SCHOOLS = 52
+EXPECTED_MIN_BOARDS = 364
+EXPECTED_ALEMBIC_VERSION = "0010"
 
 
 def run(cmd: list[str], *, env: dict[str, str], cwd: Path = BACKEND, timeout: int = 120) -> None:

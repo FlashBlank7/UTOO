@@ -220,8 +220,11 @@
               <td class="px-4 py-3 text-center text-slate-500">{{ formatDate(board.created_at) }}</td>
               <td class="px-4 py-3 text-center">
                 <button @click="patchBoard(board, 'approved')" class="link text-xs">{{ t('approve') }}</button>
-                <button @click="patchBoard(board, 'rejected')" class="ml-3 text-xs text-red-600 hover:underline">{{ t('reject') }}</button>
-                <button @click="patchBoard(board, 'hidden')" class="ml-3 text-xs text-amber-700 hover:underline">{{ t('hide') }}</button>
+                <template v-if="canRemoveBoard(board)">
+                  <button @click="patchBoard(board, 'rejected')" class="ml-3 text-xs text-red-600 hover:underline">{{ t('reject') }}</button>
+                  <button @click="patchBoard(board, 'hidden')" class="ml-3 text-xs text-amber-700 hover:underline">{{ t('hide') }}</button>
+                </template>
+                <span v-else class="ml-3 text-xs text-slate-400">{{ t('protectedBoard') }}</span>
               </td>
             </tr>
           </tbody>
@@ -231,6 +234,21 @@
     </template>
 
     <template v-if="activeTab === 'schools'">
+      <form @submit.prevent="createSchool" class="panel mb-4 grid gap-3 bg-white p-4 md:grid-cols-3">
+        <div class="md:col-span-3">
+          <p class="text-sm font-semibold text-slate-950">{{ t('createSchoolDirectly') }}</p>
+          <p class="meta mt-1">{{ t('createSchoolDirectlyHint') }}</p>
+        </div>
+        <input v-model.trim="newSchool.name_zh" required class="input" :placeholder="t('schoolNameZhPlaceholder')" />
+        <input v-model.trim="newSchool.name_en" class="input" :placeholder="t('schoolNameEnPlaceholder')" />
+        <input v-model.trim="newSchool.name_ja" class="input" :placeholder="t('schoolNameJaPlaceholder')" />
+        <input v-model.trim="newSchool.aliases" class="input md:col-span-2" :placeholder="t('schoolAliasesPlaceholder')" />
+        <button type="submit" :disabled="creatingSchool" class="btn-primary">
+          {{ creatingSchool ? t('submitting') : t('createSchool') }}
+        </button>
+        <p v-if="schoolCreateMessage" class="text-sm text-teal-700 md:col-span-3">{{ schoolCreateMessage }}</p>
+        <p v-if="schoolCreateError" class="text-sm text-red-600 md:col-span-3">{{ schoolCreateError }}</p>
+      </form>
       <div class="mb-4 flex gap-2">
         <button @click="schoolRequestStatus = 'pending'; loadSchoolRequests()" :class="schoolRequestStatus === 'pending' ? 'btn-primary' : 'btn-secondary'">{{ t('pending') }}</button>
         <button @click="schoolRequestStatus = 'approved'; loadSchoolRequests()" :class="schoolRequestStatus === 'approved' ? 'btn-primary' : 'btn-secondary'">{{ t('approved') }}</button>
@@ -467,6 +485,10 @@ const revealedAgentKey = ref('')
 const reportStatus = ref('pending')
 const boardStatus = ref('pending')
 const schoolRequestStatus = ref('pending')
+const newSchool = ref({ name_zh: '', name_en: '', name_ja: '', aliases: '' })
+const creatingSchool = ref(false)
+const schoolCreateMessage = ref('')
+const schoolCreateError = ref('')
 const announcement = ref({ title: '', content: '', school_id: null as number | null })
 const creatingAnnouncement = ref(false)
 const announcementError = ref('')
@@ -633,6 +655,27 @@ async function patchSchoolRequest(request: any, status: string) {
   if (status === 'approved') await loadSchools()
 }
 
+async function createSchool() {
+  creatingSchool.value = true
+  schoolCreateMessage.value = ''
+  schoolCreateError.value = ''
+  try {
+    const { data } = await api.post('/admin/schools', {
+      name_zh: newSchool.value.name_zh,
+      name_en: newSchool.value.name_en || null,
+      name_ja: newSchool.value.name_ja || null,
+      aliases: newSchool.value.aliases || null
+    })
+    newSchool.value = { name_zh: '', name_en: '', name_ja: '', aliases: '' }
+    schoolCreateMessage.value = t('schoolCreated', { name: schoolName(data) })
+    await loadSchools()
+  } catch (e: any) {
+    schoolCreateError.value = e.response?.data?.detail || t('schoolCreateFailed')
+  } finally {
+    creatingSchool.value = false
+  }
+}
+
 async function handleReport(report: any, action: string) {
   const payload: Record<string, any> = { action, resolution: action }
   if (action === 'mute') payload.mute_days = 1
@@ -689,6 +732,10 @@ function boardStatusLabel(status: string) {
   if (status === 'rejected') return t('rejected')
   if (status === 'hidden') return t('visibilityHidden')
   return status
+}
+
+function canRemoveBoard(board: any) {
+  return !(board.parent_id === null && board.status === 'approved')
 }
 
 function schoolName(school: any) {

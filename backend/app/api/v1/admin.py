@@ -26,7 +26,7 @@ from app.schemas.admin import (
 )
 from app.schemas.user import UserOut
 from app.schemas.post import PostOut, AuthorInfo
-from app.schemas.school import BoardOut, BoardPatchRequest, SchoolBrief, SchoolRequestOut, SchoolRequestPatch
+from app.schemas.school import BoardOut, BoardPatchRequest, SchoolBrief, SchoolOut, SchoolRequestCreate, SchoolRequestOut, SchoolRequestPatch
 from app.schemas.report import (
     ModerationLogOut,
     PatchReportRequest,
@@ -104,6 +104,23 @@ def _school_brief(school: School | None) -> SchoolBrief | None:
     )
 
 
+def _school_out(school: School) -> SchoolOut:
+    return SchoolOut(
+        id=school.id,
+        slug=school.slug,
+        name_zh=school.name_zh,
+        name_en=school.name_en,
+        name_ja=school.name_ja,
+        country=school.country,
+        kind=school.kind,
+        rank_source=school.rank_source,
+        rank_label=school.rank_label,
+        rank_order=school.rank_order,
+        theme=school.theme,
+        is_active=school.is_active,
+    )
+
+
 def _board_out(board: Board, school: School | None = None, parent_name: str | None = None) -> BoardOut:
     return BoardOut(
         id=board.id,
@@ -140,6 +157,39 @@ def _school_request_out(request: SchoolRequest, created_school: School | None = 
         created_at=request.created_at,
         updated_at=request.updated_at,
     )
+
+
+async def _create_real_school_from_input(db: AsyncSession, body: SchoolRequestCreate) -> School:
+    name_zh = body.name_zh.strip()
+    if not name_zh:
+        raise HTTPException(status_code=400, detail="School name is required")
+    primary_name = body.name_en.strip() if body.name_en else name_zh
+    slug = await unique_school_slug(db, primary_name)
+    school = School(
+        slug=slug,
+        name_zh=name_zh,
+        name_en=body.name_en.strip() if body.name_en else name_zh,
+        name_ja=body.name_ja.strip() if body.name_ja else name_zh,
+        country="Japan",
+        kind="real",
+        rank_source=None,
+        rank_label=None,
+        rank_order=None,
+        theme="standard",
+        is_active=True,
+    )
+    db.add(school)
+    await db.flush()
+    for alias, locale in [
+        (school.name_zh, "zh"),
+        (school.name_en, "en"),
+        (school.name_ja, "ja"),
+    ]:
+        await add_school_alias(db, school, alias, locale)
+    for alias in parse_aliases(body.aliases):
+        await add_school_alias(db, school, alias)
+    await create_default_boards(db, school)
+    return school
 
 
 def _user_out(user: User, school: School | None = None) -> UserOut:
@@ -390,6 +440,12 @@ async def patch_board(
     if body.status is not None:
         if body.status not in {BOARD_STATUS_APPROVED, BOARD_STATUS_PENDING, BOARD_STATUS_REJECTED, BOARD_STATUS_HIDDEN}:
             raise HTTPException(status_code=400, detail="Invalid board status")
+        if (
+            board.parent_id is None
+            and board.status == BOARD_STATUS_APPROVED
+            and body.status != BOARD_STATUS_APPROVED
+        ):
+            raise HTTPException(status_code=400, detail="Approved top-level boards cannot be removed")
         board.status = body.status
         add_moderation_log(db, current_user, "board", board.id, f"set_{body.status}", None)
     if body.sort_order is not None:
@@ -404,6 +460,19 @@ async def patch_board(
         parent = parent_result.scalar_one_or_none()
         parent_name = parent.name if parent else None
     return _board_out(board, school_result.scalar_one_or_none(), parent_name)
+
+
+@router.post("/schools", response_model=SchoolOut, status_code=status.HTTP_201_CREATED)
+async def create_school(
+    body: SchoolRequestCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    school = await _create_real_school_from_input(db, body)
+    add_moderation_log(db, current_user, "school", school.id, "create", school.slug)
+    await db.commit()
+    await db.refresh(school)
+    return _school_out(school)
 
 
 @router.get("/school-requests", response_model=list[SchoolRequestOut])
@@ -449,32 +518,17 @@ async def patch_school_request(
     request.reviewed_at = datetime.now(timezone.utc)
 
     if body.status == SCHOOL_REQUEST_APPROVED:
-        primary_name = request.name_en or request.name_zh
-        slug = await unique_school_slug(db, primary_name)
-        school = School(
-            slug=slug,
-            name_zh=request.name_zh,
-            name_en=request.name_en or request.name_zh,
-            name_ja=request.name_ja or request.name_zh,
-            country="Japan",
-            kind="real",
-            rank_source=None,
-            rank_label=None,
-            rank_order=None,
-            theme="standard",
-            is_active=True,
+        school = await _create_real_school_from_input(
+            db,
+            SchoolRequestCreate(
+                name_zh=request.name_zh,
+                name_en=request.name_en,
+                name_ja=request.name_ja,
+                aliases=request.aliases,
+                website=request.website,
+                description=request.description,
+            ),
         )
-        db.add(school)
-        await db.flush()
-        for alias, locale in [
-            (request.name_zh, "zh"),
-            (request.name_en or "", "en"),
-            (request.name_ja or "", "ja"),
-        ]:
-            await add_school_alias(db, school, alias, locale)
-        for alias in parse_aliases(request.aliases):
-            await add_school_alias(db, school, alias)
-        await create_default_boards(db, school)
         request.created_school_id = school.id
         created_school = school
         add_moderation_log(db, current_user, "school_request", request.id, "approve", school.slug)

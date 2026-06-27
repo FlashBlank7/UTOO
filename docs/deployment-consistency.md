@@ -82,7 +82,9 @@ deploying. If this check fails, do not deploy.
 
 - Treat `main` as production.
 - Avoid rapid-fire pushes to `main`; use local checks or a branch first.
-- Do not cancel a GitHub Actions run once it reaches Azure deploy.
+- The workflow uses `concurrency.cancel-in-progress: true` so a newer production
+  fix can release a stuck Azure deploy run. Avoid using that as a normal retry
+  habit; investigate the failed step after the site is stable.
 - Do not stop the App Service before deploy.
 - A successful build is not enough. Production is healthy only when:
 

@@ -11,7 +11,7 @@ on:
 
 concurrency:
   group: utoo-azure-deploy
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   AZURE_WEBAPP_NAME: UTOO-dev
@@ -116,26 +116,26 @@ jobs:
             --name "${{ env.AZURE_WEBAPP_NAME }}"
 
       - name: Deploy zip to Azure Web App
-        timeout-minutes: 8
+        timeout-minutes: 6
         run: |
           az webapp deploy \
             --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
             --name "${{ env.AZURE_WEBAPP_NAME }}" \
             --src-path backend-deploy.zip \
             --type zip \
-            --async true \
-            --restart true
+            --restart false \
+            --track-status false \
+            --timeout 300000
 
       - name: Restart Azure Web App
-        if: always()
+        timeout-minutes: 2
         run: |
-          sleep 60
           az webapp restart \
             --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
             --name "${{ env.AZURE_WEBAPP_NAME }}"
+          sleep 30
 
       - name: Check production health
-        if: always()
         run: |
           for attempt in $(seq 1 40); do
             status="$(curl -sS -o /tmp/utoo-health -w "%{http_code}" --max-time 10 "${{ env.ALLOWED_ORIGINS }}/health" || true)"

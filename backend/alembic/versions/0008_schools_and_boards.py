@@ -151,11 +151,14 @@ def upgrade() -> None:
     )
 
     with op.batch_alter_table("users") as batch_op:
-        batch_op.add_column(sa.Column("school_id", sa.Integer(), sa.ForeignKey("schools.id"), nullable=True))
+        batch_op.add_column(sa.Column("school_id", sa.Integer(), nullable=True))
         batch_op.add_column(sa.Column("school_name_custom", sa.String(length=200), nullable=True))
+        batch_op.create_foreign_key("fk_users_school_id_schools", "schools", ["school_id"], ["id"])
     with op.batch_alter_table("posts") as batch_op:
-        batch_op.add_column(sa.Column("school_id", sa.Integer(), sa.ForeignKey("schools.id"), nullable=True))
-        batch_op.add_column(sa.Column("board_id", sa.Integer(), sa.ForeignKey("boards.id"), nullable=True))
+        batch_op.add_column(sa.Column("school_id", sa.Integer(), nullable=True))
+        batch_op.add_column(sa.Column("board_id", sa.Integer(), nullable=True))
+        batch_op.create_foreign_key("fk_posts_school_id_schools", "schools", ["school_id"], ["id"])
+        batch_op.create_foreign_key("fk_posts_board_id_boards", "boards", ["board_id"], ["id"])
 
     conn = op.get_bind()
     schools = sa.table(
@@ -328,9 +331,12 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     with op.batch_alter_table("posts") as batch_op:
+        batch_op.drop_constraint("fk_posts_board_id_boards", type_="foreignkey")
+        batch_op.drop_constraint("fk_posts_school_id_schools", type_="foreignkey")
         batch_op.drop_column("board_id")
         batch_op.drop_column("school_id")
     with op.batch_alter_table("users") as batch_op:
+        batch_op.drop_constraint("fk_users_school_id_schools", type_="foreignkey")
         batch_op.drop_column("school_name_custom")
         batch_op.drop_column("school_id")
     op.drop_table("boards")

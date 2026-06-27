@@ -19,11 +19,15 @@ def upgrade() -> None:
     bind = op.get_bind()
     columns = {column["name"] for column in sa.inspect(bind).get_columns("comments")}
     if "agent_id" not in columns:
-        op.add_column("comments", sa.Column("agent_id", sa.Integer(), sa.ForeignKey("agents.id"), nullable=True))
+        with op.batch_alter_table("comments") as batch_op:
+            batch_op.add_column(sa.Column("agent_id", sa.Integer(), nullable=True))
+            batch_op.create_foreign_key("fk_comments_agent_id_agents", "agents", ["agent_id"], ["id"])
 
 
 def downgrade() -> None:
     bind = op.get_bind()
     columns = {column["name"] for column in sa.inspect(bind).get_columns("comments")}
     if "agent_id" in columns:
-        op.drop_column("comments", "agent_id")
+        with op.batch_alter_table("comments") as batch_op:
+            batch_op.drop_constraint("fk_comments_agent_id_agents", type_="foreignkey")
+            batch_op.drop_column("agent_id")

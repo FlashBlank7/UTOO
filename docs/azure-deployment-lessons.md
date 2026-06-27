@@ -64,6 +64,12 @@ build failures.
 
 ## Safe Release Checklist
 
+Read the consistency contract first:
+
+```text
+docs/deployment-consistency.md
+```
+
 Before merging to `main`:
 
 ```bash
@@ -74,6 +80,15 @@ python3 -m compileall app alembic
 ```bash
 cd frontend
 npm run build
+```
+
+Then validate the Azure App Service runtime shape:
+
+```bash
+rm -rf backend/app/static
+mkdir -p backend/app/static
+cp -R frontend/dist/. backend/app/static/
+python scripts/azure_parity_check.py --require-static
 ```
 
 After the GitHub Actions run starts:

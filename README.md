@@ -168,11 +168,18 @@ GitHub Actions 工作流位于：
 docs/azure-deployment-lessons.md
 ```
 
+部署一致性契约和必跑检查见：
+
+```text
+docs/deployment-consistency.md
+python scripts/azure_parity_check.py --require-static
+```
+
 工作流会在推送到 `main` 时：
 
 1. 构建 `frontend`
 2. 把 `frontend/dist` 复制到 `backend/app/static`
-3. 校验后端依赖和 Python 编译
+3. 校验后端依赖、Python 编译和 Azure SQLite/gunicorn runtime parity
 4. 将 Python 依赖打包进 `backend/.python_packages`
 5. 配置 Azure App Service 启动命令和 SQLite `DATABASE_URL`
 6. 将 `backend-deploy.zip` 部署到 Azure App Service

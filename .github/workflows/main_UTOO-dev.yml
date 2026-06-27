@@ -65,10 +65,19 @@ jobs:
           pip install -r requirements.txt
           python -m compileall app alembic
 
+      - name: Validate Azure runtime parity
+        run: |
+          python scripts/azure_parity_check.py --require-static
+
       - name: Vendor backend dependencies
         run: |
           rm -rf "${{ env.PYTHON_PACKAGE_DIR }}"
           python -m pip install --target "${{ env.PYTHON_PACKAGE_DIR }}" --no-cache-dir -r backend/requirements.txt
+
+      - name: Report deployment package size
+        run: |
+          du -sh backend
+          du -sh "${{ env.PYTHON_PACKAGE_DIR }}"
 
       - name: Create Azure deployment zip
         run: |

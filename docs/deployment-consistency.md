@@ -54,6 +54,9 @@ The parity script must pass all of these checks:
 
 - Compile backend Python files.
 - Run the full Alembic chain against a fresh SQLite database.
+- Run the latest SQLite migration from a simulated half-applied state, because
+  Azure can retain DDL from a failed startup migration while `alembic_version`
+  still points at the previous revision.
 - Verify `alembic_version = 0008`.
 - Verify `枝江大学` exists as `virtual_public`.
 - Verify seeded school and board counts.
@@ -70,6 +73,9 @@ deploying. If this check fails, do not deploy.
 - Foreign keys created in batch mode must have explicit names.
 - If a migration is intended to support Azure, test it from an empty SQLite
   database, not only against the existing local PostgreSQL volume.
+- For migrations that create tables and then alter existing SQLite tables, make
+  the upgrade recoverable when the new tables already exist but Alembic has not
+  advanced the version yet.
 - Keep migrations idempotent where this project already has defensive checks.
 
 ## Release Rules

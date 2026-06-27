@@ -38,14 +38,74 @@ def run(cmd: list[str], *, env: dict[str, str], cwd: Path = BACKEND, timeout: in
     subprocess.run(cmd, cwd=cwd, env=env, timeout=timeout, check=True)
 
 
-def alembic_upgrade(env: dict[str, str]) -> None:
+def alembic_upgrade(env: dict[str, str], revision: str = "head") -> None:
     code = """
+import os
 from alembic.config import Config
 from alembic import command
 cfg = Config("alembic.ini")
-command.upgrade(cfg, "head")
+command.upgrade(cfg, os.environ["ALEMBIC_TARGET_REVISION"])
 """
-    run([sys.executable, "-c", code], env=env, timeout=180)
+    command_env = env.copy()
+    command_env["ALEMBIC_TARGET_REVISION"] = revision
+    run([sys.executable, "-c", code], env=command_env, timeout=180)
+
+
+def create_partial_0008_residue(db_path: Path) -> None:
+    """Simulate a failed SQLite 0008 run that left DDL behind before versioning.
+
+    SQLite DDL is not fully transactional under Alembic. Azure may therefore
+    retain newly created tables from a failed startup migration while
+    alembic_version still points at 0007.
+    """
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            create table if not exists schools (
+                id integer primary key,
+                slug varchar(120) not null unique,
+                name_zh varchar(200) not null,
+                name_en varchar(200) not null,
+                name_ja varchar(200) not null,
+                country varchar(50) not null default 'Japan',
+                kind varchar(30) not null default 'real',
+                rank_source varchar(120),
+                rank_label varchar(30),
+                rank_order integer,
+                theme varchar(40) not null default 'standard',
+                is_active boolean not null default 1,
+                created_at datetime not null
+            )
+            """
+        )
+        conn.execute(
+            """
+            create table if not exists school_aliases (
+                id integer primary key,
+                school_id integer not null,
+                alias varchar(200) not null,
+                alias_normalized varchar(200) not null unique,
+                locale varchar(20)
+            )
+            """
+        )
+        conn.execute(
+            """
+            create table if not exists boards (
+                id integer primary key,
+                school_id integer not null,
+                parent_id integer,
+                slug varchar(120) not null,
+                name varchar(80) not null,
+                description text,
+                status varchar(20) not null default 'pending',
+                sort_order integer not null default 0,
+                created_by integer,
+                created_at datetime not null,
+                updated_at datetime not null
+            )
+            """
+        )
 
 
 def assert_sqlite_seed(db_path: Path) -> None:
@@ -149,6 +209,14 @@ def main() -> int:
             if not shutil.which("gunicorn"):
                 raise RuntimeError("gunicorn is not installed; run pip install -r backend/requirements.txt")
             boot_gunicorn(env, args.port)
+
+        partial_db_path = Path(tmpdir) / "utoo-partial-0008.db"
+        partial_env = env.copy()
+        partial_env["DATABASE_URL"] = f"sqlite+aiosqlite:///{partial_db_path}"
+        alembic_upgrade(partial_env, "0007")
+        create_partial_0008_residue(partial_db_path)
+        alembic_upgrade(partial_env)
+        assert_sqlite_seed(partial_db_path)
 
     print("Azure parity check passed.")
     return 0

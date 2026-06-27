@@ -107,60 +107,85 @@ def add_alias(conn, alias_table, school_id: int, alias: str, locale: str | None 
         conn.execute(alias_table.insert().values(school_id=school_id, alias=alias, alias_normalized=normalized, locale=locale))
 
 
+def table_exists(conn, table_name: str) -> bool:
+    return sa.inspect(conn).has_table(table_name)
+
+
+def column_exists(conn, table_name: str, column_name: str) -> bool:
+    return column_name in {column["name"] for column in sa.inspect(conn).get_columns(table_name)}
+
+
 def upgrade() -> None:
     now = datetime.utcnow()
-
-    op.create_table(
-        "schools",
-        sa.Column("id", sa.Integer(), primary_key=True, index=True),
-        sa.Column("slug", sa.String(length=120), nullable=False, unique=True),
-        sa.Column("name_zh", sa.String(length=200), nullable=False),
-        sa.Column("name_en", sa.String(length=200), nullable=False),
-        sa.Column("name_ja", sa.String(length=200), nullable=False),
-        sa.Column("country", sa.String(length=50), nullable=False, server_default="Japan"),
-        sa.Column("kind", sa.String(length=30), nullable=False, server_default="real"),
-        sa.Column("rank_source", sa.String(length=120), nullable=True),
-        sa.Column("rank_label", sa.String(length=30), nullable=True),
-        sa.Column("rank_order", sa.Integer(), nullable=True),
-        sa.Column("theme", sa.String(length=40), nullable=False, server_default="standard"),
-        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-    )
-    op.create_table(
-        "school_aliases",
-        sa.Column("id", sa.Integer(), primary_key=True, index=True),
-        sa.Column("school_id", sa.Integer(), sa.ForeignKey("schools.id"), nullable=False),
-        sa.Column("alias", sa.String(length=200), nullable=False),
-        sa.Column("alias_normalized", sa.String(length=200), nullable=False, unique=True),
-        sa.Column("locale", sa.String(length=20), nullable=True),
-    )
-    op.create_table(
-        "boards",
-        sa.Column("id", sa.Integer(), primary_key=True, index=True),
-        sa.Column("school_id", sa.Integer(), sa.ForeignKey("schools.id"), nullable=False),
-        sa.Column("parent_id", sa.Integer(), sa.ForeignKey("boards.id"), nullable=True),
-        sa.Column("slug", sa.String(length=120), nullable=False),
-        sa.Column("name", sa.String(length=80), nullable=False),
-        sa.Column("description", sa.Text(), nullable=True),
-        sa.Column("status", sa.String(length=20), nullable=False, server_default="pending"),
-        sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("created_by", sa.Integer(), sa.ForeignKey("users.id"), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.UniqueConstraint("school_id", "parent_id", "slug", name="uq_board_school_parent_slug"),
-    )
-
-    with op.batch_alter_table("users") as batch_op:
-        batch_op.add_column(sa.Column("school_id", sa.Integer(), nullable=True))
-        batch_op.add_column(sa.Column("school_name_custom", sa.String(length=200), nullable=True))
-        batch_op.create_foreign_key("fk_users_school_id_schools", "schools", ["school_id"], ["id"])
-    with op.batch_alter_table("posts") as batch_op:
-        batch_op.add_column(sa.Column("school_id", sa.Integer(), nullable=True))
-        batch_op.add_column(sa.Column("board_id", sa.Integer(), nullable=True))
-        batch_op.create_foreign_key("fk_posts_school_id_schools", "schools", ["school_id"], ["id"])
-        batch_op.create_foreign_key("fk_posts_board_id_boards", "boards", ["board_id"], ["id"])
-
     conn = op.get_bind()
+
+    if not table_exists(conn, "schools"):
+        op.create_table(
+            "schools",
+            sa.Column("id", sa.Integer(), primary_key=True, index=True),
+            sa.Column("slug", sa.String(length=120), nullable=False, unique=True),
+            sa.Column("name_zh", sa.String(length=200), nullable=False),
+            sa.Column("name_en", sa.String(length=200), nullable=False),
+            sa.Column("name_ja", sa.String(length=200), nullable=False),
+            sa.Column("country", sa.String(length=50), nullable=False, server_default="Japan"),
+            sa.Column("kind", sa.String(length=30), nullable=False, server_default="real"),
+            sa.Column("rank_source", sa.String(length=120), nullable=True),
+            sa.Column("rank_label", sa.String(length=30), nullable=True),
+            sa.Column("rank_order", sa.Integer(), nullable=True),
+            sa.Column("theme", sa.String(length=40), nullable=False, server_default="standard"),
+            sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        )
+    if not table_exists(conn, "school_aliases"):
+        op.create_table(
+            "school_aliases",
+            sa.Column("id", sa.Integer(), primary_key=True, index=True),
+            sa.Column("school_id", sa.Integer(), sa.ForeignKey("schools.id"), nullable=False),
+            sa.Column("alias", sa.String(length=200), nullable=False),
+            sa.Column("alias_normalized", sa.String(length=200), nullable=False, unique=True),
+            sa.Column("locale", sa.String(length=20), nullable=True),
+        )
+    if not table_exists(conn, "boards"):
+        op.create_table(
+            "boards",
+            sa.Column("id", sa.Integer(), primary_key=True, index=True),
+            sa.Column("school_id", sa.Integer(), sa.ForeignKey("schools.id"), nullable=False),
+            sa.Column("parent_id", sa.Integer(), sa.ForeignKey("boards.id"), nullable=True),
+            sa.Column("slug", sa.String(length=120), nullable=False),
+            sa.Column("name", sa.String(length=80), nullable=False),
+            sa.Column("description", sa.Text(), nullable=True),
+            sa.Column("status", sa.String(length=20), nullable=False, server_default="pending"),
+            sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0"),
+            sa.Column("created_by", sa.Integer(), sa.ForeignKey("users.id"), nullable=True),
+            sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+            sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+            sa.UniqueConstraint("school_id", "parent_id", "slug", name="uq_board_school_parent_slug"),
+        )
+
+    users_needs_school_id = not column_exists(conn, "users", "school_id")
+    users_needs_custom_name = not column_exists(conn, "users", "school_name_custom")
+    if users_needs_school_id or users_needs_custom_name:
+        with op.batch_alter_table("users") as batch_op:
+            if users_needs_school_id:
+                batch_op.add_column(sa.Column("school_id", sa.Integer(), nullable=True))
+            if users_needs_custom_name:
+                batch_op.add_column(sa.Column("school_name_custom", sa.String(length=200), nullable=True))
+            if users_needs_school_id:
+                batch_op.create_foreign_key("fk_users_school_id_schools", "schools", ["school_id"], ["id"])
+
+    posts_needs_school_id = not column_exists(conn, "posts", "school_id")
+    posts_needs_board_id = not column_exists(conn, "posts", "board_id")
+    if posts_needs_school_id or posts_needs_board_id:
+        with op.batch_alter_table("posts") as batch_op:
+            if posts_needs_school_id:
+                batch_op.add_column(sa.Column("school_id", sa.Integer(), nullable=True))
+            if posts_needs_board_id:
+                batch_op.add_column(sa.Column("board_id", sa.Integer(), nullable=True))
+            if posts_needs_school_id:
+                batch_op.create_foreign_key("fk_posts_school_id_schools", "schools", ["school_id"], ["id"])
+            if posts_needs_board_id:
+                batch_op.create_foreign_key("fk_posts_board_id_boards", "boards", ["board_id"], ["id"])
+
     schools = sa.table(
         "schools",
         sa.column("id", sa.Integer),
@@ -216,43 +241,45 @@ def upgrade() -> None:
         sa.column("board_id", sa.Integer),
     )
 
-    conn.execute(
-        schools.insert().values(
-            slug=DEFAULT_SCHOOL_SLUG,
-            name_zh="枝江大学",
-            name_en="Zhijiang University",
-            name_ja="枝江大学",
-            country="Public",
-            kind="virtual_public",
-            rank_source=None,
-            rank_label=None,
-            rank_order=None,
-            theme="zhijiang",
-            is_active=True,
-            created_at=now,
+    if not conn.execute(sa.select(schools.c.id).where(schools.c.slug == DEFAULT_SCHOOL_SLUG)).first():
+        conn.execute(
+            schools.insert().values(
+                slug=DEFAULT_SCHOOL_SLUG,
+                name_zh="枝江大学",
+                name_en="Zhijiang University",
+                name_ja="枝江大学",
+                country="Public",
+                kind="virtual_public",
+                rank_source=None,
+                rank_label=None,
+                rank_order=None,
+                theme="zhijiang",
+                is_active=True,
+                created_at=now,
+            )
         )
-    )
     zhijiang_id = conn.execute(sa.select(schools.c.id).where(schools.c.slug == DEFAULT_SCHOOL_SLUG)).scalar_one()
     for alias in ["枝江大学", "枝江", "公共区", "公共板块", "Zhijiang University", "Zhijiang"]:
         add_alias(conn, aliases, zhijiang_id, alias)
 
     for order, (slug, name_en, name_zh, name_ja, rank_label, alias_values) in enumerate(SCHOOLS, start=1):
-        conn.execute(
-            schools.insert().values(
-                slug=slug,
-                name_zh=name_zh,
-                name_en=name_en,
-                name_ja=name_ja,
-                country="Japan",
-                kind="real",
-                rank_source=RANK_SOURCE,
-                rank_label=rank_label,
-                rank_order=order,
-                theme="standard",
-                is_active=True,
-                created_at=now,
+        if not conn.execute(sa.select(schools.c.id).where(schools.c.slug == slug)).first():
+            conn.execute(
+                schools.insert().values(
+                    slug=slug,
+                    name_zh=name_zh,
+                    name_en=name_en,
+                    name_ja=name_ja,
+                    country="Japan",
+                    kind="real",
+                    rank_source=RANK_SOURCE,
+                    rank_label=rank_label,
+                    rank_order=order,
+                    theme="standard",
+                    is_active=True,
+                    created_at=now,
+                )
             )
-        )
         school_id = conn.execute(sa.select(schools.c.id).where(schools.c.slug == slug)).scalar_one()
         for alias in {name_en, name_zh, name_ja, *alias_values}:
             add_alias(conn, aliases, school_id, alias)
@@ -262,20 +289,28 @@ def upgrade() -> None:
     for school_id, slug, name_zh, kind in school_rows:
         defaults = PUBLIC_SCHOOL_BOARDS if slug == DEFAULT_SCHOOL_SLUG else REAL_SCHOOL_BOARDS
         for board_slug, board_name, description, sort_order in defaults:
-            conn.execute(
-                boards.insert().values(
-                    school_id=school_id,
-                    parent_id=None,
-                    slug=board_slug,
-                    name=board_name,
-                    description=description,
-                    status="approved",
-                    sort_order=sort_order,
-                    created_by=None,
-                    created_at=now,
-                    updated_at=now,
+            board_exists = conn.execute(
+                sa.select(boards.c.id).where(
+                    boards.c.school_id == school_id,
+                    boards.c.parent_id.is_(None),
+                    boards.c.slug == board_slug,
                 )
-            )
+            ).first()
+            if not board_exists:
+                conn.execute(
+                    boards.insert().values(
+                        school_id=school_id,
+                        parent_id=None,
+                        slug=board_slug,
+                        name=board_name,
+                        description=description,
+                        status="approved",
+                        sort_order=sort_order,
+                        created_by=None,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                )
             board_id = conn.execute(
                 sa.select(boards.c.id).where(
                     boards.c.school_id == school_id,
@@ -291,23 +326,31 @@ def upgrade() -> None:
         else:
             title = f"{name_zh} 简介"
             content = f"{name_zh} 板块用于收集该校相关的课程、研究室、生活、租房和就职讨论。学校种子来自 {RANK_SOURCE}。"
-        conn.execute(
-            posts.insert().values(
-                author_id=None,
-                title=title,
-                content=content,
-                is_anonymous=False,
-                department_tag=None,
-                category="公告",
-                visibility="normal",
-                is_pinned=True,
-                is_deleted=False,
-                created_at=now,
-                updated_at=now,
-                school_id=school_id,
-                board_id=notice_id,
+        intro_exists = conn.execute(
+            sa.select(posts.c.title).where(
+                posts.c.school_id == school_id,
+                posts.c.board_id == notice_id,
+                posts.c.title == title,
             )
-        )
+        ).first()
+        if not intro_exists:
+            conn.execute(
+                posts.insert().values(
+                    author_id=None,
+                    title=title,
+                    content=content,
+                    is_anonymous=False,
+                    department_tag=None,
+                    category="公告",
+                    visibility="normal",
+                    is_pinned=True,
+                    is_deleted=False,
+                    created_at=now,
+                    updated_at=now,
+                    school_id=school_id,
+                    board_id=notice_id,
+                )
+            )
 
     conn.execute(sa.text("UPDATE users SET school_id = :school_id WHERE school_id IS NULL"), {"school_id": zhijiang_id})
     category_to_slug = {

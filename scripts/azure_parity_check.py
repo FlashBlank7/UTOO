@@ -31,6 +31,7 @@ BACKEND = ROOT / "backend"
 STATIC_INDEX = BACKEND / "app" / "static" / "index.html"
 EXPECTED_MIN_SCHOOLS = 51
 EXPECTED_MIN_BOARDS = 357
+EXPECTED_ALEMBIC_VERSION = "0009"
 
 
 def run(cmd: list[str], *, env: dict[str, str], cwd: Path = BACKEND, timeout: int = 120) -> None:
@@ -117,7 +118,7 @@ def assert_sqlite_seed(db_path: Path) -> None:
             "select kind from schools where slug = 'zhijiang-university'"
         ).fetchone()
 
-    if version != ("0008",):
+    if version != (EXPECTED_ALEMBIC_VERSION,):
         raise RuntimeError(f"Unexpected Alembic version: {version!r}")
     if schools < EXPECTED_MIN_SCHOOLS:
         raise RuntimeError(f"Expected at least {EXPECTED_MIN_SCHOOLS} schools, found {schools}")

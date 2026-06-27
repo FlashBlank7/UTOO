@@ -18,6 +18,14 @@
         <input v-model.trim="form.department" class="input" :placeholder="t('departmentPlaceholder')" />
       </div>
       <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('schoolOptional') }}</label>
+        <input v-model.trim="form.school_input" class="input" list="school-options" :placeholder="t('schoolPlaceholder')" />
+        <datalist id="school-options">
+          <option v-for="school in schools" :key="school.id" :value="schoolName(school)" />
+        </datalist>
+        <p class="mt-1 text-xs text-slate-500">{{ t('schoolDefaultHint') }}</p>
+      </div>
+      <div>
         <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('password') }} <span class="text-red-600">*</span></label>
         <input v-model="form.password" type="password" required class="input" :placeholder="t('passwordPlaceholder')" minlength="6" />
       </div>
@@ -44,7 +52,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/api'
 import { useAuthStore } from '@/stores/auth'
@@ -53,11 +61,12 @@ import { useI18n } from '@/i18n'
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
-const { t } = useI18n()
+const { t, currentLocale } = useI18n()
 
-const form = ref({ activation_code: '', department: '', password: '', username: '', display_name: '', email: '' })
+const form = ref({ activation_code: '', department: '', school_input: '', password: '', username: '', display_name: '', email: '' })
 const error = ref('')
 const loading = ref(false)
+const schools = ref<any[]>([])
 const nextQuery = computed(() => {
   const next = typeof route.query.next === 'string' ? route.query.next : ''
   return next ? { next } : {}
@@ -78,6 +87,7 @@ async function submit() {
       username: form.value.username,
     }
     if (form.value.department) payload.department = form.value.department
+    if (form.value.school_input) payload.school_input = form.value.school_input
     if (form.value.display_name) payload.display_name = form.value.display_name
     if (form.value.email) payload.email = form.value.email
 
@@ -92,6 +102,12 @@ async function submit() {
   }
 }
 
+function schoolName(school: any) {
+  if (currentLocale.value === 'en') return school.name_en || school.name_zh
+  if (currentLocale.value === 'ja') return school.name_ja || school.name_zh
+  return school.name_zh || school.name_en
+}
+
 function registerErrorMessage(e: any) {
   const detail = e.response?.data?.detail
   if (detail === 'Invalid or inactive activation code') return t('invalidActivation')
@@ -103,4 +119,9 @@ function registerErrorMessage(e: any) {
   if (e.request && !e.response) return t('networkError')
   return t('registerFailed')
 }
+
+onMounted(async () => {
+  const { data } = await api.get('/schools')
+  schools.value = data
+})
 </script>

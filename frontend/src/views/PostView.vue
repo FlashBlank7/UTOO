@@ -8,6 +8,9 @@
         <div class="mb-4 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
           <span :class="post.is_pinned ? 'tag-accent' : 'tag'">{{ post.is_pinned ? t('pinned') : categoryLabel(post.category) }}</span>
           <span v-if="post.is_pinned" class="tag">{{ categoryLabel(post.category) }}</span>
+          <router-link v-if="post.school" :to="`/schools/${post.school.slug}`" class="tag hover:border-slate-500">{{ schoolName(post.school) }}</router-link>
+          <router-link v-if="post.school && post.parent_board" :to="`/schools/${post.school.slug}/boards/${post.parent_board.slug}`" class="tag hover:border-slate-500">{{ post.parent_board.name }}</router-link>
+          <router-link v-if="post.school && post.board" :to="`/schools/${post.school.slug}/boards/${post.board.slug}`" class="tag hover:border-slate-500">{{ post.board.name }}</router-link>
           <span v-if="post.department_tag" class="tag">{{ post.department_tag }}</span>
           <span class="meta ml-auto">{{ formatDate(post.created_at) }}</span>
         </div>
@@ -90,6 +93,9 @@
             <select v-model="editPost.category" class="select">
               <option v-for="category in writableCategories" :key="category" :value="category">{{ categoryLabel(category) }}</option>
             </select>
+            <select v-if="editBoards.length" v-model.number="editPost.board_id" class="select">
+              <option v-for="board in editBoards" :key="board.id" :value="board.id">{{ boardPathLabel(board) }}</option>
+            </select>
             <textarea
               ref="editPostContentInput"
               v-model.trim="editPost.content"
@@ -157,7 +163,7 @@ import StickerText from '@/components/StickerText.vue'
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
-const { t, categoryLabel, sourceLabel, formatDate } = useI18n()
+const { t, categoryLabel, sourceLabel, formatDate, currentLocale } = useI18n()
 const postId = route.params.id as string
 const categories = ['课程', '研究室', '生活', '租房', '就职', '闲聊']
 const writableCategories = computed(() => auth.isAdmin ? ['公告', ...categories] : categories)
@@ -173,7 +179,8 @@ const commentError = ref('')
 const showEdit = ref(false)
 const savingPost = ref(false)
 const postError = ref('')
-const editPost = ref({ title: '', content: '', department_tag: '', category: '闲聊', is_pinned: false })
+const editPost = ref({ title: '', content: '', department_tag: '', category: '闲聊', is_pinned: false, board_id: null as number | null })
+const editBoards = ref<any[]>([])
 const reportTarget = ref<{ type: string; id: number } | null>(null)
 const reportForm = ref({ reason: 'spam', details: '' })
 const reportError = ref('')
@@ -186,6 +193,21 @@ const editPostContentCursor = ref({ start: 0, end: 0 })
 
 const rootComments = computed(() => comments.value.filter((c) => !c.parent_id))
 const repliesOf = (id: number) => comments.value.filter((c) => c.parent_id === id)
+
+function schoolName(school: any) {
+  if (currentLocale.value === 'en') return school.name_en || school.name_zh
+  if (currentLocale.value === 'ja') return school.name_ja || school.name_zh
+  return school.name_zh || school.name_en
+}
+
+function flattenBoards(items: any[]) {
+  return items.flatMap((board) => [board, ...(board.children || [])])
+}
+
+function boardPathLabel(board: any) {
+  const parent = editBoards.value.find((item) => item.id === board.parent_id)
+  return parent ? `${parent.name} / ${board.name}` : board.name
+}
 
 const CommentBlock = defineComponent({
   props: { comment: { type: Object, required: true } },
@@ -278,13 +300,18 @@ async function refreshPostAndComments() {
   comments.value = commentsRes.data
 }
 
-function openEdit() {
+async function openEdit() {
   editPost.value = {
     title: post.value.title,
     content: post.value.content,
     department_tag: post.value.department_tag || '',
     category: post.value.category,
-    is_pinned: post.value.is_pinned
+    is_pinned: post.value.is_pinned,
+    board_id: post.value.board?.id || null
+  }
+  if (post.value.school?.slug) {
+    const { data } = await api.get(`/schools/${post.value.school.slug}/boards`)
+    editBoards.value = flattenBoards(data).filter((board: any) => auth.isAdmin || board.slug !== 'notice')
   }
   postError.value = ''
   showEdit.value = true
@@ -300,6 +327,7 @@ async function savePost() {
       category: editPost.value.category,
       department_tag: editPost.value.department_tag || null
     }
+    if (editPost.value.board_id) payload.board_id = editPost.value.board_id
     if (auth.isAdmin) payload.is_pinned = editPost.value.is_pinned
     const { data } = await api.patch(`/posts/${postId}`, payload)
     post.value = data

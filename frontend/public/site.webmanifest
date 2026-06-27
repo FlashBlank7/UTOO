@@ -1,7 +1,7 @@
 {
-  "name": "UTOO | UTokyo Student Community",
+  "name": "UTOO | International Student Platform",
   "short_name": "UTOO",
-  "description": "Independent student community for UTokyo courses, labs, life, housing, and careers.",
+  "description": "Independent platform for international students in Japan, covering schools, courses, labs, life, housing, and careers.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f8fafc",

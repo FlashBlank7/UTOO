@@ -1,10 +1,13 @@
 from datetime import datetime
 from pydantic import BaseModel
+from app.schemas.school import BoardOut, SchoolBrief
 
 
 class AuthorInfo(BaseModel):
     display_name: str
     department: str | None = None
+    school: SchoolBrief | None = None
+    school_name_custom: str | None = None
     source: str = "user"
     id: int | None = None
 
@@ -15,6 +18,7 @@ class PostCreate(BaseModel):
     is_anonymous: bool = False
     department_tag: str | None = None
     category: str = "闲聊"
+    board_id: int | None = None
 
 
 class PostUpdate(BaseModel):
@@ -22,6 +26,7 @@ class PostUpdate(BaseModel):
     content: str | None = None
     department_tag: str | None = None
     category: str | None = None
+    board_id: int | None = None
     is_pinned: bool | None = None
 
 
@@ -32,6 +37,9 @@ class PostOut(BaseModel):
     is_anonymous: bool
     department_tag: str | None
     category: str
+    school: SchoolBrief | None = None
+    board: BoardOut | None = None
+    parent_board: BoardOut | None = None
     visibility: str = "normal"
     is_pinned: bool
     created_at: datetime

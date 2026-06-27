@@ -18,6 +18,7 @@ class CodeUsageOut(BaseModel):
     username: str | None
     display_name: str | None = None
     department: str | None = None
+    school_name: str | None = None
     used_at: datetime
 
     model_config = {"from_attributes": True}
@@ -39,6 +40,8 @@ class ResetPasswordRequest(BaseModel):
 class CreateAnnouncementRequest(BaseModel):
     title: str
     content: str
+    school_id: int | None = None
+    board_id: int | None = None
 
 
 class AgentOut(BaseModel):

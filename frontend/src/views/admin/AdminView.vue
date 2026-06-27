@@ -83,6 +83,7 @@
               <th class="px-4 py-3 text-left">{{ t('username') }}</th>
               <th class="px-4 py-3 text-left">{{ t('displayName') }}</th>
               <th class="px-4 py-3 text-left">{{ t('department') }}</th>
+              <th class="px-4 py-3 text-left">{{ t('school') }}</th>
               <th class="px-4 py-3 text-center">{{ t('role') }}</th>
               <th class="px-4 py-3 text-center">{{ t('status') }}</th>
               <th class="px-4 py-3 text-center">{{ t('registeredAt') }}</th>
@@ -95,6 +96,7 @@
               <td class="px-4 py-3 font-medium text-slate-800">{{ u.username || '-' }}</td>
               <td class="px-4 py-3 text-slate-700">{{ u.display_name || '-' }}</td>
               <td class="px-4 py-3 text-slate-700">{{ u.department || '-' }}</td>
+              <td class="px-4 py-3 text-slate-700">{{ userSchoolName(u) }}</td>
               <td class="px-4 py-3 text-center">
                 <span :class="u.is_admin ? 'tag-accent' : 'tag'">{{ u.is_admin ? t('adminRole') : t('userRole') }}</span>
               </td>
@@ -146,7 +148,10 @@
                   {{ sourceLabel(post.author.source) }}
                 </span>
               </td>
-              <td class="px-4 py-3 text-center"><span class="tag">{{ categoryLabel(post.category) }}</span></td>
+              <td class="px-4 py-3 text-center">
+                <span class="tag">{{ post.school ? schoolName(post.school) : '-' }}</span>
+                <span v-if="post.board" class="tag ml-1">{{ post.board.name }}</span>
+              </td>
               <td class="px-4 py-3 text-center"><span :class="visibilityClass(post.visibility)">{{ visibilityLabel(post.visibility) }}</span></td>
               <td class="px-4 py-3 text-center text-slate-600">{{ post.comment_count }}</td>
               <td class="px-4 py-3 text-center text-slate-500">{{ formatDate(post.created_at) }}</td>
@@ -164,6 +169,9 @@
 
     <template v-if="activeTab === 'announcements'">
       <form @submit.prevent="createAnnouncement" class="panel mb-4 bg-white p-4 space-y-3">
+        <select v-model.number="announcement.school_id" class="select">
+          <option v-for="school in schools" :key="school.id" :value="school.id">{{ schoolName(school) }}</option>
+        </select>
         <input v-model.trim="announcement.title" required class="input" :placeholder="t('announcementTitlePlaceholder')" />
         <textarea v-model.trim="announcement.content" required class="input h-28 resize-none" :placeholder="t('announcementContentPlaceholder')"></textarea>
         <p v-if="announcementError" class="text-sm text-red-600">{{ announcementError }}</p>
@@ -179,6 +187,43 @@
           <p class="mt-1 line-clamp-2 text-sm text-slate-600">{{ post.content }}</p>
         </div>
         <div v-if="announcements.length === 0" class="py-8 text-center text-sm text-slate-500">{{ t('noAnnouncements') }}</div>
+      </div>
+    </template>
+
+    <template v-if="activeTab === 'boards'">
+      <div class="mb-4 flex gap-2">
+        <button @click="boardStatus = 'pending'; loadBoardRequests()" :class="boardStatus === 'pending' ? 'btn-primary' : 'btn-secondary'">{{ t('pending') }}</button>
+        <button @click="boardStatus = 'approved'; loadBoardRequests()" :class="boardStatus === 'approved' ? 'btn-primary' : 'btn-secondary'">{{ t('approved') }}</button>
+        <button @click="boardStatus = 'rejected'; loadBoardRequests()" :class="boardStatus === 'rejected' ? 'btn-primary' : 'btn-secondary'">{{ t('rejected') }}</button>
+      </div>
+      <div class="panel overflow-x-auto">
+        <table class="w-full min-w-[860px] text-sm">
+          <thead class="table-head">
+            <tr>
+              <th class="px-4 py-3 text-left">{{ t('name') }}</th>
+              <th class="px-4 py-3 text-left">{{ t('school') }}</th>
+              <th class="px-4 py-3 text-left">{{ t('description') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('status') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('createdAt') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('action') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="board in boardRequests" :key="board.id" class="table-row">
+              <td class="px-4 py-3 font-medium text-slate-900">{{ board.name }}</td>
+              <td class="px-4 py-3 text-slate-700">{{ schoolName(board.school) }}</td>
+              <td class="px-4 py-3 text-slate-600">{{ board.description || '-' }}</td>
+              <td class="px-4 py-3 text-center"><span class="tag">{{ boardStatusLabel(board.status) }}</span></td>
+              <td class="px-4 py-3 text-center text-slate-500">{{ formatDate(board.created_at) }}</td>
+              <td class="px-4 py-3 text-center">
+                <button @click="patchBoard(board, 'approved')" class="link text-xs">{{ t('approve') }}</button>
+                <button @click="patchBoard(board, 'rejected')" class="ml-3 text-xs text-red-600 hover:underline">{{ t('reject') }}</button>
+                <button @click="patchBoard(board, 'hidden')" class="ml-3 text-xs text-amber-700 hover:underline">{{ t('hide') }}</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="boardRequests.length === 0" class="py-8 text-center text-sm text-slate-500">{{ t('noBoardRequests') }}</div>
       </div>
     </template>
 
@@ -328,13 +373,14 @@ import { ref, watch, onMounted } from 'vue'
 import api from '@/api'
 import { useI18n } from '@/i18n'
 
-const { t, categoryLabel, visibilityLabel, sourceLabel, formatDate } = useI18n()
+const { t, visibilityLabel, sourceLabel, formatDate, currentLocale } = useI18n()
 
 const tabs = [
   { key: 'codes', labelKey: 'adminTabCodes' },
   { key: 'users', labelKey: 'adminTabUsers' },
   { key: 'posts', labelKey: 'adminTabPosts' },
   { key: 'announcements', labelKey: 'adminTabAnnouncements' },
+  { key: 'boards', labelKey: 'adminTabBoards' },
   { key: 'reports', labelKey: 'adminTabReports' },
   { key: 'logs', labelKey: 'adminTabLogs' },
   { key: 'agents', labelKey: 'adminTabAgents' }
@@ -344,6 +390,8 @@ const codes = ref<any[]>([])
 const users = ref<any[]>([])
 const posts = ref<any[]>([])
 const announcements = ref<any[]>([])
+const schools = ref<any[]>([])
+const boardRequests = ref<any[]>([])
 const reports = ref<any[]>([])
 const moderationLogs = ref<any[]>([])
 const agents = ref<any[]>([])
@@ -362,7 +410,8 @@ const creatingAgent = ref(false)
 const agentError = ref('')
 const revealedAgentKey = ref('')
 const reportStatus = ref('pending')
-const announcement = ref({ title: '', content: '' })
+const boardStatus = ref('pending')
+const announcement = ref({ title: '', content: '', school_id: null as number | null })
 const creatingAnnouncement = ref(false)
 const announcementError = ref('')
 
@@ -376,6 +425,15 @@ async function loadUsers() {
   users.value = data
 }
 
+async function loadSchools() {
+  const { data } = await api.get('/schools')
+  schools.value = data
+  if (!announcement.value.school_id && data.length) {
+    const publicSchool = data.find((school: any) => school.slug === 'zhijiang-university') || data[0]
+    announcement.value.school_id = publicSchool.id
+  }
+}
+
 async function loadPosts() {
   const { data } = await api.get('/posts', { params: { include_deleted: showDeletedPosts.value, page_size: 100 } })
   posts.value = data
@@ -384,6 +442,11 @@ async function loadPosts() {
 async function loadAnnouncements() {
   const { data } = await api.get('/posts', { params: { category: '公告', page_size: 100 } })
   announcements.value = data
+}
+
+async function loadBoardRequests() {
+  const { data } = await api.get('/admin/board-requests', { params: { status: boardStatus.value } })
+  boardRequests.value = data
 }
 
 async function loadReports() {
@@ -489,13 +552,18 @@ async function createAnnouncement() {
   creatingAnnouncement.value = true
   try {
     await api.post('/admin/announcements', announcement.value)
-    announcement.value = { title: '', content: '' }
+    announcement.value = { title: '', content: '', school_id: announcement.value.school_id }
     await loadAnnouncements()
   } catch (e: any) {
     announcementError.value = e.response?.data?.detail || t('announcementCreateFailed')
   } finally {
     creatingAnnouncement.value = false
   }
+}
+
+async function patchBoard(board: any, status: string) {
+  await api.patch(`/admin/boards/${board.id}`, { status })
+  await loadBoardRequests()
 }
 
 async function handleReport(report: any, action: string) {
@@ -548,15 +616,37 @@ function reportStatusLabel(status: string) {
   return status
 }
 
+function boardStatusLabel(status: string) {
+  if (status === 'pending') return t('pending')
+  if (status === 'approved') return t('approved')
+  if (status === 'rejected') return t('rejected')
+  if (status === 'hidden') return t('visibilityHidden')
+  return status
+}
+
+function schoolName(school: any) {
+  if (!school) return '-'
+  if (currentLocale.value === 'en') return school.name_en || school.name_zh
+  if (currentLocale.value === 'ja') return school.name_ja || school.name_zh
+  return school.name_zh || school.name_en
+}
+
+function userSchoolName(user: any) {
+  return user.school_name_custom || schoolName(user.school)
+}
+
 watch(activeTab, (tab) => {
   if (tab === 'users') loadUsers()
   if (tab === 'codes') loadCodes()
   if (tab === 'posts') loadPosts()
-  if (tab === 'announcements') loadAnnouncements()
+  if (tab === 'announcements') { loadSchools(); loadAnnouncements() }
+  if (tab === 'boards') loadBoardRequests()
   if (tab === 'reports') loadReports()
   if (tab === 'logs') loadModerationLogs()
   if (tab === 'agents') loadAgents()
 })
 
-onMounted(loadCodes)
+onMounted(async () => {
+  await Promise.all([loadCodes(), loadSchools()])
+})
 </script>

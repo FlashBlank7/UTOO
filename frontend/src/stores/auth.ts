@@ -8,6 +8,16 @@ interface User {
   username: string | null
   display_name: string | null
   department: string | null
+  school: {
+    id: number
+    slug: string
+    name_zh: string
+    name_en: string
+    name_ja: string
+    kind: string
+    theme: string
+  } | null
+  school_name_custom: string | null
   email: string | null
   is_admin: boolean
 }

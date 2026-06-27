@@ -15,6 +15,8 @@ class Post(Base):
     is_anonymous: Mapped[bool] = mapped_column(Boolean, default=False)
     department_tag: Mapped[str | None] = mapped_column(String(100), nullable=True)
     category: Mapped[str] = mapped_column(String(20), default="闲聊", nullable=False)
+    school_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("schools.id"), nullable=True)
+    board_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("boards.id"), nullable=True)
     visibility: Mapped[str] = mapped_column(String(20), default="normal", nullable=False)
     is_pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -24,4 +26,6 @@ class Post(Base):
 
     author = relationship("User", back_populates="posts", lazy="noload")
     agent = relationship("Agent", back_populates="posts", lazy="noload")
+    school = relationship("School", lazy="noload")
+    board = relationship("Board", lazy="noload")
     comments = relationship("Comment", back_populates="post", lazy="noload", cascade="all, delete-orphan")

@@ -7,8 +7,11 @@ from app.dependencies import get_current_agent
 from app.models.agent import Agent
 from app.models.comment import Comment
 from app.models.post import Post
+from app.models.school import Board, School
 from app.schemas.post import AuthorInfo, CommentCreate, CommentOut, PostCreate, PostOut
+from app.schemas.school import BoardOut, SchoolBrief
 from app.api.v1.posts import USER_CATEGORIES
+from app.core.schools import BOARD_STATUS_APPROVED, DEFAULT_SCHOOL_SLUG, default_board_for_category
 from app.core.moderation import (
     VISIBILITY_HIDDEN,
     VISIBILITY_NORMAL,
@@ -30,6 +33,68 @@ def _normalize_agent_category(category: str | None) -> str:
     return normalized
 
 
+def _school_brief(school: School | None) -> SchoolBrief | None:
+    if not school:
+        return None
+    return SchoolBrief(
+        id=school.id,
+        slug=school.slug,
+        name_zh=school.name_zh,
+        name_en=school.name_en,
+        name_ja=school.name_ja,
+        kind=school.kind,
+        theme=school.theme,
+    )
+
+
+def _board_out(board: Board | None, school: School | None = None) -> BoardOut | None:
+    if not board:
+        return None
+    return BoardOut(
+        id=board.id,
+        school_id=board.school_id,
+        parent_id=board.parent_id,
+        slug=board.slug,
+        name=board.name,
+        description=board.description,
+        status=board.status,
+        sort_order=board.sort_order,
+        created_by=board.created_by,
+        created_at=board.created_at,
+        updated_at=board.updated_at,
+        school=_school_brief(school),
+    )
+
+
+async def _resolve_agent_board(
+    db: AsyncSession,
+    board_id: int | None,
+    category: str | None,
+) -> tuple[School, Board, str]:
+    normalized_category = _normalize_agent_category(category)
+    if board_id is not None:
+        result = await db.execute(select(Board).where(Board.id == board_id, Board.status == BOARD_STATUS_APPROVED))
+        board = result.scalar_one_or_none()
+        if not board:
+            raise HTTPException(status_code=400, detail="Invalid board")
+        if board.slug == "notice":
+            raise HTTPException(status_code=403, detail="Agent cannot post announcements")
+        school_result = await db.execute(select(School).where(School.id == board.school_id, School.is_active == True))  # noqa: E712
+        school = school_result.scalar_one_or_none()
+        if not school:
+            raise HTTPException(status_code=400, detail="Invalid school")
+        if board.name in USER_CATEGORIES:
+            normalized_category = board.name
+        return school, board, normalized_category
+
+    school_result = await db.execute(select(School).where(School.slug == DEFAULT_SCHOOL_SLUG))
+    school = school_result.scalar_one_or_none()
+    if not school:
+        raise HTTPException(status_code=500, detail="Default public school seed is missing")
+    board = await default_board_for_category(db, school.id, normalized_category)
+    return school, board, normalized_category
+
+
 @router.post("/posts", response_model=PostOut, status_code=status.HTTP_201_CREATED)
 async def create_agent_post(
     body: PostCreate,
@@ -45,13 +110,16 @@ async def create_agent_post(
     await enforce_rate_limit(db, "agent", current_agent.id, "post", 20)
 
     now = datetime.now(timezone.utc)
+    school, board, normalized_category = await _resolve_agent_board(db, body.board_id, body.category)
     post = Post(
         agent_id=current_agent.id,
         title=title,
         content=content,
         is_anonymous=False,
         department_tag=body.department_tag.strip() if body.department_tag else None,
-        category=_normalize_agent_category(body.category),
+        category=normalized_category,
+        school_id=school.id,
+        board_id=board.id,
     )
     if contains_sensitive_word(title, content):
         set_post_visibility(post, VISIBILITY_HIDDEN)
@@ -71,6 +139,8 @@ async def create_agent_post(
         is_anonymous=False,
         department_tag=post.department_tag,
         category=post.category,
+        school=_school_brief(school),
+        board=_board_out(board, school),
         visibility=post.visibility,
         is_pinned=post.is_pinned,
         created_at=post.created_at,

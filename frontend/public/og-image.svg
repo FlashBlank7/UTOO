@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
   <title id="title">UTOO social preview</title>
-  <desc id="desc">Social preview card for UTOO, an independent UTokyo student community.</desc>
+  <desc id="desc">Social preview card for UTOO, an independent international student platform in Japan.</desc>
   <rect width="1200" height="630" fill="#f8fafc"/>
   <path d="M0 0h1200v630H0z" fill="#f8fafc"/>
   <path d="M0 0h1200v72H0z" fill="#0f172a"/>
@@ -18,9 +18,9 @@
     <path d="M207 101c12-20 26-26 45-31" stroke="#ef4444" stroke-width="10" stroke-linecap="round"/>
   </g>
   <text x="128" y="178" fill="#0f172a" font-family="Inter, Arial, sans-serif" font-size="82" font-weight="800" letter-spacing="0">UTOO</text>
-  <text x="128" y="232" fill="#0B8BEE" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="700" letter-spacing="0">UTokyo student community</text>
-  <text x="128" y="306" fill="#334155" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="600" letter-spacing="0">课程 · 研究室 · 生活 · 租房 · 就职</text>
-  <text x="128" y="362" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="25" letter-spacing="0">An independent forum for student knowledge, campus life, and practical discussion.</text>
+  <text x="128" y="232" fill="#0B8BEE" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="700" letter-spacing="0">International Student Platform</text>
+  <text x="128" y="306" fill="#334155" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="600" letter-spacing="0">学校 · 课程 · 研究室 · 生活 · 租房 · 就职</text>
+  <text x="128" y="362" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="25" letter-spacing="0">A school-board forum for international students in Japan.</text>
   <g transform="translate(128 416)" font-family="Inter, Arial, sans-serif" font-size="23" font-weight="700">
     <rect width="96" height="42" rx="4" fill="#0f172a"/>
     <text x="24" y="28" fill="#ffffff">课程</text>
@@ -33,5 +33,5 @@
     <rect x="472" width="96" height="42" rx="4" fill="#ffffff" stroke="#cbd5e1"/>
     <text x="496" y="28" fill="#334155">就职</text>
   </g>
-  <text x="128" y="538" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="18" letter-spacing="0">Independent student community. Not an official University of Tokyo service.</text>
+  <text x="128" y="538" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="18" letter-spacing="0">Independent student community. Not an official service of any university or institution.</text>
 </svg>

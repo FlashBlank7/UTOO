@@ -6,9 +6,12 @@ from sqlalchemy import select
 from jose import JWTError
 from app.db.session import get_db
 from app.models.user import User
+from app.models.school import School
 from app.models.activation_code import ActivationCode, ActivationCodeUsage
 from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
+from app.core.schools import resolve_school_input
 from app.schemas.user import RegisterRequest, LoginRequest, RefreshRequest, TokenResponse, UserOut, UpdateMeRequest
+from app.schemas.school import SchoolBrief
 from app.dependencies import get_current_user
 
 router = APIRouter()
@@ -16,11 +19,46 @@ router = APIRouter()
 ADMIN_BOOTSTRAP_CODE = "UTOO-ADMIN"
 
 
+def _school_brief(school: School | None) -> SchoolBrief | None:
+    if not school:
+        return None
+    return SchoolBrief(
+        id=school.id,
+        slug=school.slug,
+        name_zh=school.name_zh,
+        name_en=school.name_en,
+        name_ja=school.name_ja,
+        kind=school.kind,
+        theme=school.theme,
+    )
+
+
+async def _user_out(db: AsyncSession, user: User) -> UserOut:
+    school = None
+    if user.school_id:
+        school_result = await db.execute(select(School).where(School.id == user.school_id))
+        school = school_result.scalar_one_or_none()
+    return UserOut(
+        id=user.id,
+        username=user.username,
+        display_name=user.display_name,
+        department=user.department,
+        school=_school_brief(school),
+        school_name_custom=user.school_name_custom,
+        email=user.email,
+        is_admin=user.is_admin,
+        is_banned=user.is_banned,
+        muted_until=user.muted_until,
+        created_at=user.created_at,
+    )
+
+
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     username = body.username.strip()
     display_name = body.display_name.strip() if body.display_name else None
     department = body.department.strip() if body.department else None
+    school, school_name_custom = await resolve_school_input(db, body.school_input)
 
     if not username:
         raise HTTPException(status_code=400, detail="Username is required")
@@ -45,6 +83,8 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
             existing_admin.display_name = display_name
             existing_admin.hashed_password = hash_password(body.password)
             existing_admin.department = department
+            existing_admin.school_id = school.id
+            existing_admin.school_name_custom = school_name_custom
             existing_admin.email = str(body.email) if body.email else None
             await db.commit()
             await db.refresh(existing_admin)
@@ -80,6 +120,8 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         display_name=display_name,
         hashed_password=hash_password(body.password),
         department=department,
+        school_id=school.id,
+        school_name_custom=school_name_custom,
         email=str(body.email) if body.email else None,
         is_admin=is_admin,
     )
@@ -136,8 +178,8 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserOut)
-async def me(current_user: User = Depends(get_current_user)):
-    return current_user
+async def me(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return await _user_out(db, current_user)
 
 
 @router.patch("/me", response_model=UserOut)
@@ -151,7 +193,12 @@ async def update_me(
         current_user.display_name = display_name or None
 
     if "department" in body.model_fields_set:
-        current_user.department = body.department.strip() or None
+        current_user.department = body.department.strip() if body.department else None
+
+    if "school_input" in body.model_fields_set:
+        school, school_name_custom = await resolve_school_input(db, body.school_input)
+        current_user.school_id = school.id
+        current_user.school_name_custom = school_name_custom
 
     if "email" in body.model_fields_set:
         email = str(body.email) if body.email else None
@@ -172,4 +219,4 @@ async def update_me(
 
     await db.commit()
     await db.refresh(current_user)
-    return current_user
+    return await _user_out(db, current_user)

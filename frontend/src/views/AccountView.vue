@@ -19,6 +19,14 @@
         <input v-model.trim="profile.department" class="input" :placeholder="t('departmentPlaceholder')" />
       </div>
       <div>
+        <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('schoolOptional') }}</label>
+        <input v-model.trim="profile.school_input" class="input" list="account-school-options" :placeholder="t('schoolPlaceholder')" />
+        <datalist id="account-school-options">
+          <option v-for="school in schools" :key="school.id" :value="schoolName(school)" />
+        </datalist>
+        <p class="mt-1 text-xs text-slate-500">{{ t('schoolDefaultHint') }}</p>
+      </div>
+      <div>
         <label class="mb-1 block text-sm font-medium text-slate-700">{{ t('email') }}</label>
         <input v-model.trim="profile.email" type="email" class="input" :placeholder="t('optional')" />
       </div>
@@ -59,10 +67,11 @@ import { useAuthStore } from '@/stores/auth'
 import { useI18n } from '@/i18n'
 
 const auth = useAuthStore()
-const { t } = useI18n()
+const { t, currentLocale } = useI18n()
 
-const profile = ref({ display_name: '', department: '', email: '' })
+const profile = ref({ display_name: '', department: '', school_input: '', email: '' })
 const password = ref({ current_password: '', new_password: '' })
+const schools = ref<any[]>([])
 const savingProfile = ref(false)
 const savingPassword = ref(false)
 const profileMessage = ref('')
@@ -74,6 +83,7 @@ function hydrateProfile() {
   profile.value = {
     display_name: auth.user?.display_name || '',
     department: auth.user?.department || '',
+    school_input: auth.user?.school_name_custom || (auth.user?.school ? schoolName(auth.user.school) : ''),
     email: auth.user?.email || ''
   }
 }
@@ -86,6 +96,7 @@ async function saveProfile() {
     await api.patch('/auth/me', {
       display_name: profile.value.display_name || null,
       department: profile.value.department || null,
+      school_input: profile.value.school_input || null,
       email: profile.value.email || null
     })
     await auth.fetchMe()
@@ -96,6 +107,12 @@ async function saveProfile() {
   } finally {
     savingProfile.value = false
   }
+}
+
+function schoolName(school: any) {
+  if (currentLocale.value === 'en') return school.name_en || school.name_zh
+  if (currentLocale.value === 'ja') return school.name_ja || school.name_zh
+  return school.name_zh || school.name_en
 }
 
 async function changePassword() {
@@ -118,6 +135,8 @@ async function changePassword() {
 
 onMounted(async () => {
   if (!auth.user) await auth.fetchMe()
+  const { data } = await api.get('/schools')
+  schools.value = data
   hydrateProfile()
 })
 </script>

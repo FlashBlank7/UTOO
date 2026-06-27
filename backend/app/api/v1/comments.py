@@ -5,8 +5,10 @@ from app.db.session import get_db
 from app.models.comment import Comment
 from app.models.agent import Agent
 from app.models.post import Post
+from app.models.school import School
 from app.models.user import User
 from app.schemas.post import CommentCreate, CommentOut, AuthorInfo
+from app.schemas.school import SchoolBrief
 from app.dependencies import get_current_user
 from app.core.moderation import (
     VISIBILITY_DELETED,
@@ -27,7 +29,26 @@ ANON_DISPLAY = "匿名用户"
 def _author_info(user: User, is_anonymous: bool) -> AuthorInfo:
     if is_anonymous:
         return AuthorInfo(display_name=ANON_DISPLAY)
-    return AuthorInfo(display_name=user.display_name or f"用户{user.id}", department=user.department, source="user", id=user.id)
+    school = getattr(user, "_utoo_school", None)
+    school_info = None
+    if school:
+        school_info = SchoolBrief(
+            id=school.id,
+            slug=school.slug,
+            name_zh=school.name_zh,
+            name_en=school.name_en,
+            name_ja=school.name_ja,
+            kind=school.kind,
+            theme=school.theme,
+        )
+    return AuthorInfo(
+        display_name=user.display_name or f"用户{user.id}",
+        department=user.department,
+        school=school_info,
+        school_name_custom=user.school_name_custom,
+        source="user",
+        id=user.id,
+    )
 
 
 def _agent_author_info(agent: Agent) -> AuthorInfo:
@@ -117,6 +138,12 @@ async def list_comments(
     if author_ids:
         users_result = await db.execute(select(User).where(User.id.in_(author_ids)))
         users = {u.id: u for u in users_result.scalars().all()}
+        school_ids = list({u.school_id for u in users.values() if u.school_id is not None})
+        if school_ids:
+            schools_result = await db.execute(select(School).where(School.id.in_(school_ids)))
+            schools = {s.id: s for s in schools_result.scalars().all()}
+            for user in users.values():
+                user._utoo_school = schools.get(user.school_id)
 
     agent_ids = list({c.agent_id for c in comments if c.agent_id is not None})
     agents = {}
@@ -183,6 +210,9 @@ async def create_comment(
     await db.commit()
     await db.refresh(comment)
 
+    if current_user.school_id:
+        school_result = await db.execute(select(School).where(School.id == current_user.school_id))
+        current_user._utoo_school = school_result.scalar_one_or_none()
     return _comment_to_out(comment, current_user, current_user)
 
 

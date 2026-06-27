@@ -11,6 +11,7 @@ from app.models.post import Post
 from app.models.agent import Agent
 from app.models.comment import Comment
 from app.models.report import ModerationLog, Report
+from app.models.school import Board, School
 from app.schemas.admin import (
     AgentOut,
     AgentWithKeyOut,
@@ -25,6 +26,7 @@ from app.schemas.admin import (
 )
 from app.schemas.user import UserOut
 from app.schemas.post import PostOut, AuthorInfo
+from app.schemas.school import BoardOut, BoardPatchRequest, SchoolBrief
 from app.schemas.report import (
     ModerationLogOut,
     PatchReportRequest,
@@ -44,6 +46,7 @@ from app.core.moderation import (
     set_comment_visibility,
     set_post_visibility,
 )
+from app.core.schools import BOARD_STATUS_APPROVED, BOARD_STATUS_HIDDEN, BOARD_STATUS_PENDING, BOARD_STATUS_REJECTED, DEFAULT_SCHOOL_SLUG
 from app.dependencies import get_current_admin
 
 router = APIRouter()
@@ -72,6 +75,100 @@ def _validate_visibility(visibility: str) -> str:
     if visibility not in {VISIBILITY_NORMAL, VISIBILITY_HIDDEN, VISIBILITY_DELETED}:
         raise HTTPException(status_code=400, detail="Invalid visibility")
     return visibility
+
+
+def _school_brief(school: School | None) -> SchoolBrief | None:
+    if not school:
+        return None
+    return SchoolBrief(
+        id=school.id,
+        slug=school.slug,
+        name_zh=school.name_zh,
+        name_en=school.name_en,
+        name_ja=school.name_ja,
+        kind=school.kind,
+        theme=school.theme,
+    )
+
+
+def _board_out(board: Board, school: School | None = None) -> BoardOut:
+    return BoardOut(
+        id=board.id,
+        school_id=board.school_id,
+        parent_id=board.parent_id,
+        slug=board.slug,
+        name=board.name,
+        description=board.description,
+        status=board.status,
+        sort_order=board.sort_order,
+        created_by=board.created_by,
+        created_at=board.created_at,
+        updated_at=board.updated_at,
+        school=_school_brief(school),
+    )
+
+
+def _user_out(user: User, school: School | None = None) -> UserOut:
+    return UserOut(
+        id=user.id,
+        username=user.username,
+        display_name=user.display_name,
+        department=user.department,
+        school=_school_brief(school),
+        school_name_custom=user.school_name_custom,
+        email=user.email,
+        is_admin=user.is_admin,
+        is_banned=user.is_banned,
+        muted_until=user.muted_until,
+        created_at=user.created_at,
+    )
+
+
+async def _user_with_school(db: AsyncSession, user: User) -> UserOut:
+    school = None
+    if user.school_id:
+        school_result = await db.execute(select(School).where(School.id == user.school_id))
+        school = school_result.scalar_one_or_none()
+    return _user_out(user, school)
+
+
+async def _notice_board_for_announcement(
+    db: AsyncSession,
+    school_id: int | None,
+    board_id: int | None,
+) -> tuple[School, Board]:
+    if board_id is not None:
+        board_result = await db.execute(select(Board).where(Board.id == board_id, Board.status == BOARD_STATUS_APPROVED))
+        board = board_result.scalar_one_or_none()
+        if not board or board.slug != "notice":
+            raise HTTPException(status_code=400, detail="Announcement board must be an approved notice board")
+        school_result = await db.execute(select(School).where(School.id == board.school_id, School.is_active == True))  # noqa: E712
+        school = school_result.scalar_one_or_none()
+        if not school:
+            raise HTTPException(status_code=400, detail="Invalid school")
+        return school, board
+
+    stmt = select(School).where(School.is_active == True)  # noqa: E712
+    if school_id is not None:
+        stmt = stmt.where(School.id == school_id)
+    else:
+        stmt = stmt.where(School.slug == DEFAULT_SCHOOL_SLUG)
+    school_result = await db.execute(stmt)
+    school = school_result.scalar_one_or_none()
+    if not school:
+        raise HTTPException(status_code=400, detail="Invalid school")
+    board_result = await db.execute(
+        select(Board).where(
+            Board.school_id == school.id,
+            Board.parent_id.is_(None),
+            Board.slug == "notice",
+            Board.status == BOARD_STATUS_APPROVED,
+        )
+    )
+    board = board_result.scalar_one_or_none()
+    if not board:
+        raise HTTPException(status_code=400, detail="Notice board is missing")
+    return school, board
 
 
 async def _target_author(db: AsyncSession, target_type: str, target_id: int) -> User | None:
@@ -135,6 +232,7 @@ async def code_usages(
             username=users[u.user_id].username,
             display_name=users[u.user_id].display_name,
             department=users[u.user_id].department,
+            school_name=users[u.user_id].school_name_custom,
             used_at=u.used_at,
         )
         for u in usages
@@ -167,7 +265,13 @@ async def list_users(
     _: User = Depends(get_current_admin),
 ):
     result = await db.execute(select(User).order_by(User.created_at.desc()))
-    return result.scalars().all()
+    users = result.scalars().all()
+    school_ids = list({u.school_id for u in users if u.school_id is not None})
+    schools = {}
+    if school_ids:
+        school_result = await db.execute(select(School).where(School.id.in_(school_ids)))
+        schools = {s.id: s for s in school_result.scalars().all()}
+    return [_user_out(user, schools.get(user.school_id)) for user in users]
 
 
 @router.patch("/users/{user_id}/moderation", response_model=UserOut)
@@ -203,7 +307,59 @@ async def moderate_user(
 
     await db.commit()
     await db.refresh(user)
-    return user
+    return await _user_with_school(db, user)
+
+
+@router.get("/board-requests", response_model=list[BoardOut])
+async def list_board_requests(
+    status_filter: str | None = Query(BOARD_STATUS_PENDING, alias="status"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    stmt = select(Board).order_by(Board.created_at.desc())
+    if status_filter:
+        stmt = stmt.where(Board.status == status_filter)
+    result = await db.execute(stmt)
+    boards = result.scalars().all()
+    if not boards:
+        return []
+    school_ids = list({board.school_id for board in boards})
+    school_result = await db.execute(select(School).where(School.id.in_(school_ids)))
+    schools = {school.id: school for school in school_result.scalars().all()}
+    return [_board_out(board, schools.get(board.school_id)) for board in boards]
+
+
+@router.patch("/boards/{board_id}", response_model=BoardOut)
+async def patch_board(
+    board_id: int,
+    body: BoardPatchRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    result = await db.execute(select(Board).where(Board.id == board_id))
+    board = result.scalar_one_or_none()
+    if not board:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+    if body.name is not None:
+        name = body.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Board name is required")
+        board.name = name
+    if "description" in body.model_fields_set:
+        board.description = body.description.strip() if body.description else None
+    if body.status is not None:
+        if body.status not in {BOARD_STATUS_APPROVED, BOARD_STATUS_PENDING, BOARD_STATUS_REJECTED, BOARD_STATUS_HIDDEN}:
+            raise HTTPException(status_code=400, detail="Invalid board status")
+        board.status = body.status
+        add_moderation_log(db, current_user, "board", board.id, f"set_{body.status}", None)
+    if body.sort_order is not None:
+        board.sort_order = body.sort_order
+
+    await db.commit()
+    await db.refresh(board)
+    school_result = await db.execute(select(School).where(School.id == board.school_id))
+    return _board_out(board, school_result.scalar_one_or_none())
 
 
 @router.get("/agents", response_model=list[AgentOut])
@@ -429,11 +585,14 @@ async def create_announcement(
         raise HTTPException(status_code=400, detail="Title is required")
     if not content:
         raise HTTPException(status_code=400, detail="Content is required")
+    school, board = await _notice_board_for_announcement(db, body.school_id, body.board_id)
     post = Post(
         author_id=current_user.id,
         title=title,
         content=content,
         category="公告",
+        school_id=school.id,
+        board_id=board.id,
         is_pinned=True,
         visibility=VISIBILITY_NORMAL,
     )
@@ -449,6 +608,8 @@ async def create_announcement(
         is_anonymous=False,
         department_tag=None,
         category=post.category,
+        school=_school_brief(school),
+        board=_board_out(board, school),
         visibility=post.visibility,
         is_pinned=post.is_pinned,
         created_at=post.created_at,
@@ -456,6 +617,8 @@ async def create_announcement(
         author=AuthorInfo(
             display_name=current_user.display_name or f"用户{current_user.id}",
             department=current_user.department,
+            school=_school_brief(school),
+            school_name_custom=current_user.school_name_custom,
             source="user",
             id=current_user.id,
         ),
@@ -483,4 +646,4 @@ async def reset_user_password(
     user.hashed_password = hash_password(body.new_password)
     await db.commit()
     await db.refresh(user)
-    return user
+    return await _user_with_school(db, user)

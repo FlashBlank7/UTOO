@@ -100,6 +100,15 @@
           </div>
           <div class="flex flex-col gap-2 sm:flex-row lg:shrink-0">
             <button @click="showSchoolSwitcher = true" class="btn-secondary">{{ t('switchSchool') }}</button>
+            <button
+              v-if="selectedSchool && moderatorApplyBoard"
+              type="button"
+              :disabled="moderatorApplyDisabled || applyingModerator"
+              @click="applyModerator"
+              class="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {{ moderatorApplyLabel }}
+            </button>
             <button @click="openNewPost" class="btn-primary">{{ t('newPost') }}</button>
           </div>
         </div>
@@ -388,6 +397,8 @@ const posts = ref<any[]>([])
 const announcements = ref<any[]>([])
 const schools = ref<School[]>([])
 const boards = ref<Board[]>([])
+const managementScopes = ref<any[]>([])
+const moderatorApplications = ref<any[]>([])
 const loading = ref(false)
 const searchText = ref('')
 const appliedSearch = ref('')
@@ -402,6 +413,7 @@ const schoolSearch = ref('')
 const savingDescription = ref(false)
 const descriptionSaveError = ref('')
 const descriptionEditor = ref<null | { type: 'school' | 'board'; id: number; title: string; value: string }>(null)
+const applyingModerator = ref(false)
 const newPostContentInput = ref<HTMLTextAreaElement | null>(null)
 const newPostContentCursor = ref({ start: 0, end: 0 })
 const categories = ['课程', '研究室', '生活', '租房', '就职', '闲聊']
@@ -446,7 +458,21 @@ const childBoardsForActive = computed(() => {
 const isZhijiang = computed(() => selectedSchool.value?.slug === 'zhijiang-university' || selectedSchool.value?.theme === 'zhijiang')
 const schoolDescription = computed(() => selectedSchool.value?.description || (isZhijiang.value ? t('zhijiangSpecialIntro') : t('schoolIntro')))
 const activeBoardDescription = computed(() => activeBoard.value?.description || '')
-const canEditDescriptions = computed(() => auth.isAdmin)
+const managedSchoolIds = computed(() => new Set(managementScopes.value.map((scope: any) => scope.school.id)))
+const canManageSelectedSchool = computed(() => Boolean(auth.isAdmin || (selectedSchool.value && managedSchoolIds.value.has(selectedSchool.value.id))))
+const canEditDescriptions = computed(() => canManageSelectedSchool.value)
+const moderatorApplyBoard = computed(() => activeBoard.value || boards.value[0] || null)
+const hasPendingModeratorApplication = computed(() => {
+  if (!selectedSchool.value) return false
+  return moderatorApplications.value.some((application: any) => application.school?.id === selectedSchool.value?.id && application.status === 'pending')
+})
+const moderatorApplyDisabled = computed(() => Boolean(auth.isAdmin || (selectedSchool.value && managedSchoolIds.value.has(selectedSchool.value.id)) || hasPendingModeratorApplication.value))
+const moderatorApplyLabel = computed(() => {
+  if (auth.isAdmin) return t('adminAlreadyManages')
+  if (selectedSchool.value && managedSchoolIds.value.has(selectedSchool.value.id)) return t('alreadyModerator')
+  if (hasPendingModeratorApplication.value) return t('moderatorApplicationPending')
+  return t('applyModerator')
+})
 const selectedPostId = computed(() => typeof route.query.post === 'string' ? route.query.post : '')
 const filteredSchools = computed(() => {
   const query = schoolSearch.value.trim().toLowerCase()
@@ -531,10 +557,12 @@ async function saveDescription() {
   descriptionSaveError.value = ''
   try {
     if (descriptionEditor.value.type === 'school') {
-      await api.patch(`/admin/schools/${descriptionEditor.value.id}`, { description: descriptionEditor.value.value || null })
+      const prefix = auth.isAdmin ? '/admin' : '/management'
+      await api.patch(`${prefix}/schools/${descriptionEditor.value.id}`, { description: descriptionEditor.value.value || null })
       await loadSchools()
     } else {
-      await api.patch(`/admin/boards/${descriptionEditor.value.id}`, { description: descriptionEditor.value.value || null })
+      const prefix = auth.isAdmin ? '/admin' : '/management'
+      await api.patch(`${prefix}/boards/${descriptionEditor.value.id}`, { description: descriptionEditor.value.value || null })
       await loadBoards()
     }
     descriptionEditor.value = null
@@ -601,6 +629,16 @@ async function loadSchools() {
   if (!auth.isLoggedIn) return
   const { data } = await api.get('/schools')
   schools.value = data
+}
+
+async function loadManagementState() {
+  if (!auth.isLoggedIn) return
+  const [scopesResponse, applicationsResponse] = await Promise.all([
+    api.get('/management/scopes'),
+    api.get('/moderator-applications/me')
+  ])
+  managementScopes.value = scopesResponse.data.scopes || []
+  moderatorApplications.value = applicationsResponse.data || []
 }
 
 async function loadBoards() {
@@ -681,18 +719,34 @@ async function requestBoard() {
   boardRequestMessage.value = ''
   boardRequestError.value = ''
   try {
-    await api.post('/boards', {
+    const endpoint = canManageSelectedSchool.value ? '/management/boards' : '/boards'
+    await api.post(endpoint, {
       school_id: selectedSchool.value.id,
       parent_id: boardRequest.value.parent_id,
       name: boardRequest.value.name,
       description: boardRequest.value.description || null
     })
     boardRequest.value = { name: '', description: '', parent_id: null }
-    boardRequestMessage.value = t('boardRequestSubmitted')
+    boardRequestMessage.value = canManageSelectedSchool.value ? t('boardCreated') : t('boardRequestSubmitted')
+    if (canManageSelectedSchool.value) await loadBoards()
   } catch (e: any) {
     boardRequestError.value = e.response?.data?.detail || t('boardRequestFailed')
   } finally {
     requestingBoard.value = false
+  }
+}
+
+async function applyModerator() {
+  if (!moderatorApplyBoard.value || moderatorApplyDisabled.value) return
+  applyingModerator.value = true
+  try {
+    await api.post('/moderator-applications', {
+      board_id: moderatorApplyBoard.value.id,
+      reason: selectedSchool.value ? `Apply to moderate ${schoolName(selectedSchool.value)}` : null
+    })
+    await loadManagementState()
+  } finally {
+    applyingModerator.value = false
   }
 }
 
@@ -715,10 +769,13 @@ watch(selectedBoardSlug, loadPosts)
 watch(() => auth.isLoggedIn, async (loggedIn) => {
   if (loggedIn) {
     await loadSchools()
+    await loadManagementState()
     await refreshForum()
   } else {
     schools.value = []
     boards.value = []
+    managementScopes.value = []
+    moderatorApplications.value = []
     posts.value = []
     announcements.value = []
   }
@@ -726,6 +783,7 @@ watch(() => auth.isLoggedIn, async (loggedIn) => {
 onMounted(async () => {
   if (auth.isLoggedIn) {
     await loadSchools()
+    await loadManagementState()
     await refreshForum()
   }
 })

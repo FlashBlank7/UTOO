@@ -299,6 +299,47 @@
       </div>
     </template>
 
+    <template v-if="activeTab === 'moderators'">
+      <div class="mb-4 flex gap-2">
+        <button @click="moderatorApplicationStatus = 'pending'; loadModeratorApplications()" :class="moderatorApplicationStatus === 'pending' ? 'btn-primary' : 'btn-secondary'">{{ t('pending') }}</button>
+        <button @click="moderatorApplicationStatus = 'approved'; loadModeratorApplications()" :class="moderatorApplicationStatus === 'approved' ? 'btn-primary' : 'btn-secondary'">{{ t('approved') }}</button>
+        <button @click="moderatorApplicationStatus = 'rejected'; loadModeratorApplications()" :class="moderatorApplicationStatus === 'rejected' ? 'btn-primary' : 'btn-secondary'">{{ t('rejected') }}</button>
+      </div>
+      <div class="panel overflow-x-auto">
+        <table class="w-full min-w-[900px] text-sm">
+          <thead class="table-head">
+            <tr>
+              <th class="px-4 py-3 text-left">{{ t('applicant') }}</th>
+              <th class="px-4 py-3 text-left">{{ t('school') }}</th>
+              <th class="px-4 py-3 text-left">{{ t('board') }}</th>
+              <th class="px-4 py-3 text-left">{{ t('reason') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('status') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('createdAt') }}</th>
+              <th class="px-4 py-3 text-center">{{ t('action') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="application in moderatorApplications" :key="application.id" class="table-row">
+              <td class="px-4 py-3 font-medium text-slate-900">{{ application.applicant_name || `#${application.applicant_id}` }}</td>
+              <td class="px-4 py-3 text-slate-700">{{ schoolName(application.school) }}</td>
+              <td class="px-4 py-3 text-slate-700">{{ application.board.name }}</td>
+              <td class="px-4 py-3 text-slate-600">{{ application.reason || '-' }}</td>
+              <td class="px-4 py-3 text-center"><span class="tag">{{ boardStatusLabel(application.status) }}</span></td>
+              <td class="px-4 py-3 text-center text-slate-500">{{ formatDate(application.created_at) }}</td>
+              <td class="px-4 py-3 text-center">
+                <template v-if="application.status === 'pending'">
+                  <button @click="patchModeratorApplication(application, 'approved')" class="link text-xs">{{ t('approve') }}</button>
+                  <button @click="patchModeratorApplication(application, 'rejected')" class="ml-3 text-xs text-red-600 hover:underline">{{ t('reject') }}</button>
+                </template>
+                <span v-else class="text-xs text-slate-500">-</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="moderatorApplications.length === 0" class="py-8 text-center text-sm text-slate-500">{{ t('noModeratorApplications') }}</div>
+      </div>
+    </template>
+
     <template v-if="activeTab === 'reports'">
       <div class="mb-4 flex gap-2">
         <button @click="reportStatus = 'pending'; loadReports()" :class="reportStatus === 'pending' ? 'btn-primary' : 'btn-secondary'">{{ t('pending') }}</button>
@@ -454,6 +495,7 @@ const tabs = [
   { key: 'announcements', labelKey: 'adminTabAnnouncements' },
   { key: 'boards', labelKey: 'adminTabBoards' },
   { key: 'schools', labelKey: 'adminTabSchools' },
+  { key: 'moderators', labelKey: 'adminTabModerators' },
   { key: 'reports', labelKey: 'adminTabReports' },
   { key: 'logs', labelKey: 'adminTabLogs' },
   { key: 'agents', labelKey: 'adminTabAgents' }
@@ -466,6 +508,7 @@ const announcements = ref<any[]>([])
 const schools = ref<any[]>([])
 const boardRequests = ref<any[]>([])
 const schoolRequests = ref<any[]>([])
+const moderatorApplications = ref<any[]>([])
 const reports = ref<any[]>([])
 const moderationLogs = ref<any[]>([])
 const agents = ref<any[]>([])
@@ -486,6 +529,7 @@ const revealedAgentKey = ref('')
 const reportStatus = ref('pending')
 const boardStatus = ref('pending')
 const schoolRequestStatus = ref('pending')
+const moderatorApplicationStatus = ref('pending')
 const newSchool = ref({ name_zh: '', name_en: '', name_ja: '', aliases: '', description: '' })
 const creatingSchool = ref(false)
 const schoolCreateMessage = ref('')
@@ -531,6 +575,11 @@ async function loadBoardRequests() {
 async function loadSchoolRequests() {
   const { data } = await api.get('/admin/school-requests', { params: { status: schoolRequestStatus.value } })
   schoolRequests.value = data
+}
+
+async function loadModeratorApplications() {
+  const { data } = await api.get('/admin/moderator-applications', { params: { status: moderatorApplicationStatus.value } })
+  moderatorApplications.value = data
 }
 
 async function loadReports() {
@@ -656,6 +705,11 @@ async function patchSchoolRequest(request: any, status: string) {
   if (status === 'approved') await loadSchools()
 }
 
+async function patchModeratorApplication(application: any, status: string) {
+  await api.patch(`/admin/moderator-applications/${application.id}`, { status })
+  await loadModeratorApplications()
+}
+
 async function createSchool() {
   creatingSchool.value = true
   schoolCreateMessage.value = ''
@@ -737,7 +791,7 @@ function boardStatusLabel(status: string) {
 }
 
 function canRemoveBoard(board: any) {
-  return !(board.parent_id === null && board.status === 'approved')
+  return board.status !== 'hidden'
 }
 
 function schoolName(school: any) {
@@ -758,6 +812,7 @@ watch(activeTab, (tab) => {
   if (tab === 'announcements') { loadSchools(); loadAnnouncements() }
   if (tab === 'boards') loadBoardRequests()
   if (tab === 'schools') loadSchoolRequests()
+  if (tab === 'moderators') loadModeratorApplications()
   if (tab === 'reports') loadReports()
   if (tab === 'logs') loadModerationLogs()
   if (tab === 'agents') loadAgents()

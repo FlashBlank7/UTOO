@@ -11,7 +11,7 @@ from app.models.post import Post
 from app.models.agent import Agent
 from app.models.comment import Comment
 from app.models.report import ModerationLog, Report
-from app.models.school import Board, School, SchoolRequest
+from app.models.school import Board, ModeratorApplication, School, SchoolModerator, SchoolRequest
 from app.schemas.admin import (
     AgentOut,
     AgentWithKeyOut,
@@ -27,6 +27,13 @@ from app.schemas.admin import (
 from app.schemas.user import UserOut
 from app.schemas.post import PostOut, AuthorInfo
 from app.schemas.school import BoardOut, BoardPatchRequest, SchoolBrief, SchoolOut, SchoolPatchRequest, SchoolRequestCreate, SchoolRequestOut, SchoolRequestPatch
+from app.schemas.management import (
+    MODERATOR_APPLICATION_APPROVED,
+    MODERATOR_APPLICATION_PENDING,
+    MODERATOR_APPLICATION_REJECTED,
+    ModeratorApplicationOut,
+    ModeratorApplicationPatch,
+)
 from app.schemas.report import (
     ModerationLogOut,
     PatchReportRequest,
@@ -138,6 +145,27 @@ def _board_out(board: Board, school: School | None = None, parent_name: str | No
         updated_at=board.updated_at,
         school=_school_brief(school),
         parent_name=parent_name,
+    )
+
+
+def _moderator_application_out(
+    application: ModeratorApplication,
+    school: School,
+    board: Board,
+    applicant: User | None = None,
+) -> ModeratorApplicationOut:
+    return ModeratorApplicationOut(
+        id=application.id,
+        applicant_id=application.applicant_id,
+        applicant_name=(applicant.display_name or applicant.username) if applicant else None,
+        school=_school_brief(school),
+        board=_board_out(board, school),
+        reason=application.reason,
+        status=application.status,
+        reviewed_by=application.reviewed_by,
+        reviewed_at=application.reviewed_at,
+        created_at=application.created_at,
+        updated_at=application.updated_at,
     )
 
 
@@ -443,12 +471,6 @@ async def patch_board(
     if body.status is not None:
         if body.status not in {BOARD_STATUS_APPROVED, BOARD_STATUS_PENDING, BOARD_STATUS_REJECTED, BOARD_STATUS_HIDDEN}:
             raise HTTPException(status_code=400, detail="Invalid board status")
-        if (
-            board.parent_id is None
-            and board.status == BOARD_STATUS_APPROVED
-            and body.status != BOARD_STATUS_APPROVED
-        ):
-            raise HTTPException(status_code=400, detail="Approved top-level boards cannot be removed")
         board.status = body.status
         add_moderation_log(db, current_user, "board", board.id, f"set_{body.status}", None)
     if body.sort_order is not None:
@@ -497,6 +519,95 @@ async def patch_school(
     await db.commit()
     await db.refresh(school)
     return _school_out(school)
+
+
+@router.get("/moderator-applications", response_model=list[ModeratorApplicationOut])
+async def list_moderator_applications(
+    status_filter: str | None = Query(MODERATOR_APPLICATION_PENDING, alias="status"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_admin),
+):
+    stmt = select(ModeratorApplication).order_by(ModeratorApplication.created_at.desc())
+    if status_filter:
+        stmt = stmt.where(ModeratorApplication.status == status_filter)
+    result = await db.execute(stmt)
+    applications = result.scalars().all()
+    if not applications:
+        return []
+    school_ids = {application.school_id for application in applications}
+    board_ids = {application.board_id for application in applications}
+    applicant_ids = {application.applicant_id for application in applications}
+    school_result = await db.execute(select(School).where(School.id.in_(school_ids)))
+    board_result = await db.execute(select(Board).where(Board.id.in_(board_ids)))
+    user_result = await db.execute(select(User).where(User.id.in_(applicant_ids)))
+    schools = {school.id: school for school in school_result.scalars().all()}
+    boards = {board.id: board for board in board_result.scalars().all()}
+    users = {user.id: user for user in user_result.scalars().all()}
+    return [
+        _moderator_application_out(application, schools[application.school_id], boards[application.board_id], users.get(application.applicant_id))
+        for application in applications
+        if application.school_id in schools and application.board_id in boards
+    ]
+
+
+@router.patch("/moderator-applications/{application_id}", response_model=ModeratorApplicationOut)
+async def patch_moderator_application(
+    application_id: int,
+    body: ModeratorApplicationPatch,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    if body.status not in {MODERATOR_APPLICATION_APPROVED, MODERATOR_APPLICATION_REJECTED}:
+        raise HTTPException(status_code=400, detail="Invalid moderator application status")
+    result = await db.execute(select(ModeratorApplication).where(ModeratorApplication.id == application_id))
+    application = result.scalar_one_or_none()
+    if not application:
+        raise HTTPException(status_code=404, detail="Moderator application not found")
+    if application.status != MODERATOR_APPLICATION_PENDING:
+        raise HTTPException(status_code=400, detail="Moderator application already reviewed")
+
+    school_result = await db.execute(select(School).where(School.id == application.school_id))
+    board_result = await db.execute(select(Board).where(Board.id == application.board_id))
+    user_result = await db.execute(select(User).where(User.id == application.applicant_id))
+    school = school_result.scalar_one_or_none()
+    board = board_result.scalar_one_or_none()
+    applicant = user_result.scalar_one_or_none()
+    if not school or not board or not applicant:
+        raise HTTPException(status_code=400, detail="Application target is missing")
+
+    application.status = body.status
+    application.reviewed_by = current_user.id
+    application.reviewed_at = datetime.now(timezone.utc)
+
+    if body.status == MODERATOR_APPLICATION_APPROVED:
+        moderator_result = await db.execute(
+            select(SchoolModerator).where(
+                SchoolModerator.user_id == application.applicant_id,
+                SchoolModerator.school_id == application.school_id,
+            )
+        )
+        moderator = moderator_result.scalar_one_or_none()
+        if moderator:
+            moderator.is_active = True
+            moderator.granted_by = current_user.id
+            moderator.source_board_id = application.board_id
+        else:
+            db.add(
+                SchoolModerator(
+                    user_id=application.applicant_id,
+                    school_id=application.school_id,
+                    granted_by=current_user.id,
+                    source_board_id=application.board_id,
+                    is_active=True,
+                )
+            )
+        add_moderation_log(db, current_user, "mod_app", application.id, "approve", school.slug)
+    else:
+        add_moderation_log(db, current_user, "mod_app", application.id, "reject", school.slug)
+
+    await db.commit()
+    await db.refresh(application)
+    return _moderator_application_out(application, school, board, applicant)
 
 
 @router.get("/school-requests", response_model=list[SchoolRequestOut])

@@ -153,13 +153,15 @@ The platform should support a small but real moderation loop:
 - deleted content is soft-deleted;
 - hidden content is not shown in normal user lists.
 
-Moderators are part of the target design but are not fully implemented yet. The expected future model is scoped moderation:
+Moderator scope is school-wide in v1:
 
 ```text
-moderator -> school scope and/or board scope
+application from any board -> approved school moderator -> manages all boards in that school
 ```
 
-Moderators should be able to manage content and edit descriptions only inside their assigned scope.
+Moderators are an admin subset. They can manage board structure, descriptions, school-scoped reports, and content visibility inside their assigned school. They cannot manage activation codes, agents, users, bans/mutes, or school creation.
+
+Board deletion is a soft archive operation. Administrators and school moderators hide boards from normal navigation, while existing posts and audit history remain intact.
 
 ## 8. Admin Console
 
@@ -173,6 +175,7 @@ Admin responsibilities:
 - content visibility;
 - announcements;
 - board/subboard review;
+- moderator application review;
 - school catalog maintenance;
 - agent management;
 - audit logs.
@@ -202,14 +205,12 @@ Zhijiang University can give Yutoko a more playful public-square position, but r
 
 ## 10. Current Implementation Gaps
 
-These are known mismatches between the latest design and the current codebase:
+These are known follow-ups beyond the current v1:
 
-- Remove user-facing school request from normal forum UI. Schools should be selected directly; missing schools are an admin maintenance task.
-- Add editable school and board descriptions for admins first, then scoped moderators.
-- Introduce moderator roles and school/board scopes.
-- Fix the duplicated first-level board navigation so only child boards appear in the secondary row.
-- Keep first-level board removal protected in both backend and UI.
-- Update README and UI text wherever “申请学校” is still presented as a normal user flow.
+- Add finer moderator assignment controls if school-wide scope becomes too broad.
+- Add moderator removal/deactivation UI for administrators.
+- Add richer report context in the management queue, such as target title and direct links.
+- Decide whether historical school request records should stay visible in admin or be retired completely.
 
 ## 11. Deployment Notes
 

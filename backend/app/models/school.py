@@ -88,3 +88,50 @@ class SchoolRequest(Base):
 
     requester = relationship("User", foreign_keys=[requested_by], lazy="noload")
     created_school = relationship("School", foreign_keys=[created_school_id], lazy="noload")
+
+
+class SchoolModerator(Base):
+    __tablename__ = "school_moderators"
+    __table_args__ = (
+        UniqueConstraint("user_id", "school_id", name="uq_school_moderator_user_school"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    school_id: Mapped[int] = mapped_column(Integer, ForeignKey("schools.id"), nullable=False)
+    granted_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    source_board_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("boards.id"), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    user = relationship("User", foreign_keys=[user_id], lazy="noload")
+    school = relationship("School", foreign_keys=[school_id], lazy="noload")
+    source_board = relationship("Board", foreign_keys=[source_board_id], lazy="noload")
+
+
+class ModeratorApplication(Base):
+    __tablename__ = "moderator_applications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    applicant_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    school_id: Mapped[int] = mapped_column(Integer, ForeignKey("schools.id"), nullable=False)
+    board_id: Mapped[int] = mapped_column(Integer, ForeignKey("boards.id"), nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)
+    reviewed_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    applicant = relationship("User", foreign_keys=[applicant_id], lazy="noload")
+    school = relationship("School", foreign_keys=[school_id], lazy="noload")
+    board = relationship("Board", foreign_keys=[board_id], lazy="noload")

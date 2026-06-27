@@ -6,7 +6,8 @@
         <div class="flex items-center gap-4 text-sm">
           <template v-if="auth.isLoggedIn">
             <router-link to="/account" class="text-slate-600 hover:text-slate-950">{{ auth.displayName }}</router-link>
-            <router-link v-if="auth.isAdmin" to="/admin" class="link">{{ t('navAdmin') }}</router-link>
+            <router-link to="/manage" class="link">{{ t('navManage') }}</router-link>
+            <router-link v-if="auth.isAdmin" to="/admin" class="link">{{ t('navAdminFull') }}</router-link>
             <button @click="auth.logout(); $router.push('/')" class="text-slate-500 hover:text-slate-950">{{ t('logout') }}</button>
           </template>
           <template v-else>

@@ -18,6 +18,7 @@ class School(Base):
     rank_label: Mapped[str | None] = mapped_column(String(30), nullable=True)
     rank_order: Mapped[int | None] = mapped_column(Integer, nullable=True)
     theme: Mapped[str] = mapped_column(String(40), default="standard", nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 

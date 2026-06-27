@@ -26,7 +26,7 @@ from app.schemas.admin import (
 )
 from app.schemas.user import UserOut
 from app.schemas.post import PostOut, AuthorInfo
-from app.schemas.school import BoardOut, BoardPatchRequest, SchoolBrief, SchoolOut, SchoolRequestCreate, SchoolRequestOut, SchoolRequestPatch
+from app.schemas.school import BoardOut, BoardPatchRequest, SchoolBrief, SchoolOut, SchoolPatchRequest, SchoolRequestCreate, SchoolRequestOut, SchoolRequestPatch
 from app.schemas.report import (
     ModerationLogOut,
     PatchReportRequest,
@@ -101,6 +101,7 @@ def _school_brief(school: School | None) -> SchoolBrief | None:
         name_ja=school.name_ja,
         kind=school.kind,
         theme=school.theme,
+        description=school.description,
     )
 
 
@@ -117,6 +118,7 @@ def _school_out(school: School) -> SchoolOut:
         rank_label=school.rank_label,
         rank_order=school.rank_order,
         theme=school.theme,
+        description=school.description,
         is_active=school.is_active,
     )
 
@@ -176,6 +178,7 @@ async def _create_real_school_from_input(db: AsyncSession, body: SchoolRequestCr
         rank_label=None,
         rank_order=None,
         theme="standard",
+        description=body.description.strip() if body.description else None,
         is_active=True,
     )
     db.add(school)
@@ -470,6 +473,27 @@ async def create_school(
 ):
     school = await _create_real_school_from_input(db, body)
     add_moderation_log(db, current_user, "school", school.id, "create", school.slug)
+    await db.commit()
+    await db.refresh(school)
+    return _school_out(school)
+
+
+@router.patch("/schools/{school_id}", response_model=SchoolOut)
+async def patch_school(
+    school_id: int,
+    body: SchoolPatchRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_admin),
+):
+    result = await db.execute(select(School).where(School.id == school_id))
+    school = result.scalar_one_or_none()
+    if not school:
+        raise HTTPException(status_code=404, detail="School not found")
+
+    if "description" in body.model_fields_set:
+        school.description = body.description.strip() if body.description else None
+        add_moderation_log(db, current_user, "school", school.id, "update_description", None)
+
     await db.commit()
     await db.refresh(school)
     return _school_out(school)

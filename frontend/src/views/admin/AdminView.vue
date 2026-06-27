@@ -246,6 +246,7 @@
         <button type="submit" :disabled="creatingSchool" class="btn-primary">
           {{ creatingSchool ? t('submitting') : t('createSchool') }}
         </button>
+        <textarea v-model.trim="newSchool.description" class="input h-20 resize-none md:col-span-3" :placeholder="t('descriptionPlaceholder')"></textarea>
         <p v-if="schoolCreateMessage" class="text-sm text-teal-700 md:col-span-3">{{ schoolCreateMessage }}</p>
         <p v-if="schoolCreateError" class="text-sm text-red-600 md:col-span-3">{{ schoolCreateError }}</p>
       </form>
@@ -485,7 +486,7 @@ const revealedAgentKey = ref('')
 const reportStatus = ref('pending')
 const boardStatus = ref('pending')
 const schoolRequestStatus = ref('pending')
-const newSchool = ref({ name_zh: '', name_en: '', name_ja: '', aliases: '' })
+const newSchool = ref({ name_zh: '', name_en: '', name_ja: '', aliases: '', description: '' })
 const creatingSchool = ref(false)
 const schoolCreateMessage = ref('')
 const schoolCreateError = ref('')
@@ -664,9 +665,10 @@ async function createSchool() {
       name_zh: newSchool.value.name_zh,
       name_en: newSchool.value.name_en || null,
       name_ja: newSchool.value.name_ja || null,
-      aliases: newSchool.value.aliases || null
+      aliases: newSchool.value.aliases || null,
+      description: newSchool.value.description || null
     })
-    newSchool.value = { name_zh: '', name_en: '', name_ja: '', aliases: '' }
+    newSchool.value = { name_zh: '', name_en: '', name_ja: '', aliases: '', description: '' }
     schoolCreateMessage.value = t('schoolCreated', { name: schoolName(data) })
     await loadSchools()
   } catch (e: any) {

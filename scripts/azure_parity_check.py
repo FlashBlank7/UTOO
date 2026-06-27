@@ -31,7 +31,7 @@ BACKEND = ROOT / "backend"
 STATIC_INDEX = BACKEND / "app" / "static" / "index.html"
 EXPECTED_MIN_SCHOOLS = 52
 EXPECTED_MIN_BOARDS = 364
-EXPECTED_ALEMBIC_VERSION = "0010"
+EXPECTED_ALEMBIC_VERSION = "0011"
 
 
 def run(cmd: list[str], *, env: dict[str, str], cwd: Path = BACKEND, timeout: int = 120) -> None:

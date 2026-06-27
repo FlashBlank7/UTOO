@@ -84,15 +84,22 @@
               <span v-else class="tag">{{ t('schoolBoard') }}</span>
             </div>
             <p class="mt-3 max-w-4xl text-sm leading-6 text-slate-600">
-              {{ isZhijiang ? t('zhijiangSpecialIntro') : t('schoolIntro') }}
+              {{ schoolDescription }}
             </p>
+            <button
+              v-if="canEditDescriptions"
+              type="button"
+              @click="openDescriptionEditor('school')"
+              class="mt-2 text-xs font-medium text-slate-600 underline-offset-4 hover:text-slate-950 hover:underline"
+            >
+              {{ t('editDescription') }}
+            </button>
             <div v-if="isZhijiang" class="mt-4 flex flex-wrap gap-2">
               <span v-for="signal in zhijiangSignals" :key="signal" class="border border-fuchsia-200 bg-white/80 px-2 py-1 text-xs font-medium text-fuchsia-800">{{ t(signal) }}</span>
             </div>
           </div>
           <div class="flex flex-col gap-2 sm:flex-row lg:shrink-0">
             <button @click="showSchoolSwitcher = true" class="btn-secondary">{{ t('switchSchool') }}</button>
-            <button @click="showSchoolRequest = true" class="btn-secondary">{{ t('requestSchool') }}</button>
             <button @click="openNewPost" class="btn-primary">{{ t('newPost') }}</button>
           </div>
         </div>
@@ -123,6 +130,19 @@
           {{ t('subboardTitle', { parent: activeParentBoard?.name || '', child: activeChildBoard.name }) }}
         </h2>
         <p v-else-if="activeParentBoard" class="mt-2 text-xl font-semibold text-slate-950">{{ activeParentBoard.name }}</p>
+        <div v-if="activeBoard" class="mt-2 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+          <p class="max-w-4xl text-sm leading-6 text-slate-600">
+            {{ activeBoardDescription || t('boardIntroFallback') }}
+          </p>
+          <button
+            v-if="canEditDescriptions"
+            type="button"
+            @click="openDescriptionEditor('board')"
+            class="shrink-0 text-xs font-medium text-slate-600 underline-offset-4 hover:text-slate-950 hover:underline"
+          >
+            {{ t('editDescription') }}
+          </button>
+        </div>
       </div>
 
       <div class="border-b border-slate-200 px-3 py-3">
@@ -153,21 +173,6 @@
         <button @click="applySearch" class="btn-secondary">{{ t('search') }}</button>
       </div>
 
-      <div class="flex flex-wrap gap-1 border-t border-slate-200 px-3 py-3">
-        <button
-          v-for="item in filterCategories"
-          :key="item.value || 'all'"
-          @click="filterCategory = item.value"
-          :class="[
-            'rounded-[3px] border px-3 py-1.5 text-xs font-medium transition-colors',
-            filterCategory === item.value
-              ? 'border-slate-950 bg-slate-950 text-white'
-              : 'border-slate-300 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-950'
-          ]"
-        >
-          {{ item.label }}
-        </button>
-      </div>
     </section>
 
     <section v-if="selectedSchool" class="panel mb-5 bg-white p-4">
@@ -274,27 +279,25 @@
       </div>
     </div>
 
-    <div v-if="showSchoolRequest" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 px-4">
+    <div v-if="descriptionEditor" class="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 px-4">
       <div class="panel w-full max-w-xl bg-white p-5">
         <div class="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
           <div>
-            <h2 class="text-base font-semibold text-slate-950">{{ t('requestSchool') }}</h2>
-            <p class="meta mt-1">{{ t('requestSchoolHint') }}</p>
+            <h2 class="text-base font-semibold text-slate-950">{{ t('editDescription') }}</h2>
+            <p class="meta mt-1">{{ descriptionEditor.title }}</p>
           </div>
-          <button @click="showSchoolRequest = false" class="text-sm text-slate-500 hover:text-slate-950">{{ t('close') }}</button>
+          <button @click="descriptionEditor = null" class="text-sm text-slate-500 hover:text-slate-950">{{ t('close') }}</button>
         </div>
-        <form @submit.prevent="requestSchool" class="space-y-3">
-          <input v-model.trim="schoolRequest.name_zh" required class="input" :placeholder="t('schoolNameZhPlaceholder')" />
-          <input v-model.trim="schoolRequest.name_en" class="input" :placeholder="t('schoolNameEnPlaceholder')" />
-          <input v-model.trim="schoolRequest.name_ja" class="input" :placeholder="t('schoolNameJaPlaceholder')" />
-          <input v-model.trim="schoolRequest.aliases" class="input" :placeholder="t('schoolAliasesPlaceholder')" />
-          <input v-model.trim="schoolRequest.website" class="input" :placeholder="t('schoolWebsitePlaceholder')" />
-          <textarea v-model.trim="schoolRequest.description" class="input h-24 resize-none" :placeholder="t('schoolRequestDescriptionPlaceholder')"></textarea>
-          <p v-if="schoolRequestMessage" class="text-sm text-teal-700">{{ schoolRequestMessage }}</p>
-          <p v-if="schoolRequestError" class="text-sm text-red-600">{{ schoolRequestError }}</p>
+        <form @submit.prevent="saveDescription" class="space-y-3">
+          <textarea
+            v-model.trim="descriptionEditor.value"
+            class="input h-36 resize-none"
+            :placeholder="t('descriptionPlaceholder')"
+          ></textarea>
+          <p v-if="descriptionSaveError" class="text-sm text-red-600">{{ descriptionSaveError }}</p>
           <div class="flex justify-end gap-3">
-            <button type="button" @click="showSchoolRequest = false" class="btn-secondary">{{ t('cancel') }}</button>
-            <button type="submit" :disabled="requestingSchool" class="btn-primary">{{ requestingSchool ? t('submitting') : t('submitSchoolRequest') }}</button>
+            <button type="button" @click="descriptionEditor = null" class="btn-secondary">{{ t('cancel') }}</button>
+            <button type="submit" :disabled="savingDescription" class="btn-primary">{{ savingDescription ? t('saving') : t('save') }}</button>
           </div>
         </form>
       </div>
@@ -363,6 +366,7 @@ type School = {
   name_ja: string
   kind: string
   theme: string
+  description?: string | null
 }
 
 type Board = {
@@ -385,7 +389,6 @@ const announcements = ref<any[]>([])
 const schools = ref<School[]>([])
 const boards = ref<Board[]>([])
 const loading = ref(false)
-const filterCategory = ref<string | null>(null)
 const searchText = ref('')
 const appliedSearch = ref('')
 const showNewPost = ref(false)
@@ -395,11 +398,10 @@ const boardRequestMessage = ref('')
 const boardRequestError = ref('')
 const requestingBoard = ref(false)
 const showSchoolSwitcher = ref(false)
-const showSchoolRequest = ref(false)
 const schoolSearch = ref('')
-const requestingSchool = ref(false)
-const schoolRequestMessage = ref('')
-const schoolRequestError = ref('')
+const savingDescription = ref(false)
+const descriptionSaveError = ref('')
+const descriptionEditor = ref<null | { type: 'school' | 'board'; id: number; title: string; value: string }>(null)
 const newPostContentInput = ref<HTMLTextAreaElement | null>(null)
 const newPostContentCursor = ref({ start: 0, end: 0 })
 const categories = ['课程', '研究室', '生活', '租房', '就职', '闲聊']
@@ -421,11 +423,6 @@ const zhijiangCards = [
   { title: 'zhijiangCardBroadcastTitle', body: 'zhijiangCardBroadcastBody' },
   { title: 'zhijiangCardSupportTitle', body: 'zhijiangCardSupportBody' }
 ]
-const filterCategories = computed(() => [
-  { label: t('categoryAll'), value: null },
-  { label: categoryLabel('公告'), value: '公告' },
-  ...categories.map((category) => ({ label: categoryLabel(category), value: category }))
-])
 const writableCategories = computed(() => auth.isAdmin ? ['公告', ...categories] : categories)
 const selectedSchoolSlug = computed(() => {
   const routeSlug = typeof route.params.schoolSlug === 'string' ? route.params.schoolSlug : ''
@@ -441,8 +438,15 @@ const activeParentBoard = computed(() => {
   return boards.value.find((board) => board.id === activeBoard.value?.parent_id) || null
 })
 const activeChildBoard = computed(() => activeBoard.value?.parent_id ? activeBoard.value : null)
-const childBoardsForActive = computed(() => activeParentBoard.value?.children || [])
+const childBoardsForActive = computed(() => {
+  const parent = activeParentBoard.value
+  if (!parent?.children?.length) return []
+  return parent.children.filter((child) => child.parent_id === parent.id && child.id !== parent.id)
+})
 const isZhijiang = computed(() => selectedSchool.value?.slug === 'zhijiang-university' || selectedSchool.value?.theme === 'zhijiang')
+const schoolDescription = computed(() => selectedSchool.value?.description || (isZhijiang.value ? t('zhijiangSpecialIntro') : t('schoolIntro')))
+const activeBoardDescription = computed(() => activeBoard.value?.description || '')
+const canEditDescriptions = computed(() => auth.isAdmin)
 const selectedPostId = computed(() => typeof route.query.post === 'string' ? route.query.post : '')
 const filteredSchools = computed(() => {
   const query = schoolSearch.value.trim().toLowerCase()
@@ -459,7 +463,6 @@ const filteredSchools = computed(() => {
 const requestableParents = computed(() => boards.value.filter((board) => board.slug !== 'notice'))
 const writableBoards = computed(() => flatBoards.value.filter((board) => auth.isAdmin || board.slug !== 'notice'))
 const boardRequest = ref<{ name: string; description: string; parent_id: number | null }>({ name: '', description: '', parent_id: null })
-const schoolRequest = ref({ name_zh: '', name_en: '', name_ja: '', aliases: '', website: '', description: '' })
 const newPost = ref({ title: '', content: '', department_tag: '', category: '闲聊', is_anonymous: false, board_id: null as number | null })
 
 function schoolName(school: School | null | undefined) {
@@ -500,6 +503,46 @@ function childBoardClass(board: Board) {
 function boardPathLabel(board: Board) {
   const parent = boards.value.find((item) => item.id === board.parent_id)
   return parent ? `${parent.name} / ${board.name}` : board.name
+}
+
+function openDescriptionEditor(type: 'school' | 'board') {
+  descriptionSaveError.value = ''
+  if (type === 'school' && selectedSchool.value) {
+    descriptionEditor.value = {
+      type,
+      id: selectedSchool.value.id,
+      title: schoolName(selectedSchool.value),
+      value: selectedSchool.value.description || ''
+    }
+  }
+  if (type === 'board' && activeBoard.value) {
+    descriptionEditor.value = {
+      type,
+      id: activeBoard.value.id,
+      title: boardPathLabel(activeBoard.value),
+      value: activeBoard.value.description || ''
+    }
+  }
+}
+
+async function saveDescription() {
+  if (!descriptionEditor.value) return
+  savingDescription.value = true
+  descriptionSaveError.value = ''
+  try {
+    if (descriptionEditor.value.type === 'school') {
+      await api.patch(`/admin/schools/${descriptionEditor.value.id}`, { description: descriptionEditor.value.value || null })
+      await loadSchools()
+    } else {
+      await api.patch(`/admin/boards/${descriptionEditor.value.id}`, { description: descriptionEditor.value.value || null })
+      await loadBoards()
+    }
+    descriptionEditor.value = null
+  } catch (e: any) {
+    descriptionSaveError.value = e.response?.data?.detail || t('descriptionSaveFailed')
+  } finally {
+    savingDescription.value = false
+  }
 }
 
 function postBoardLabel(post: any) {
@@ -572,7 +615,6 @@ async function loadPosts() {
   try {
     const params: Record<string, string | number> = { school_slug: selectedSchoolSlug.value }
     if (activeBoard.value) params.board_id = activeBoard.value.id
-    if (filterCategory.value) params.category = filterCategory.value
     if (appliedSearch.value) params.q = appliedSearch.value
     const { data } = await api.get('/posts', { params })
     posts.value = data
@@ -654,28 +696,6 @@ async function requestBoard() {
   }
 }
 
-async function requestSchool() {
-  requestingSchool.value = true
-  schoolRequestMessage.value = ''
-  schoolRequestError.value = ''
-  try {
-    await api.post('/school-requests', {
-      name_zh: schoolRequest.value.name_zh,
-      name_en: schoolRequest.value.name_en || null,
-      name_ja: schoolRequest.value.name_ja || null,
-      aliases: schoolRequest.value.aliases || null,
-      website: schoolRequest.value.website || null,
-      description: schoolRequest.value.description || null
-    })
-    schoolRequest.value = { name_zh: '', name_en: '', name_ja: '', aliases: '', website: '', description: '' }
-    schoolRequestMessage.value = t('schoolRequestSubmitted')
-  } catch (e: any) {
-    schoolRequestError.value = e.response?.data?.detail || t('schoolRequestFailed')
-  } finally {
-    requestingSchool.value = false
-  }
-}
-
 function apiErrorMessage(e: any, fallback: string) {
   if (e.response?.status === 429) return t('rateLimited')
   return e.response?.data?.detail || fallback
@@ -685,9 +705,7 @@ function notifyMascot(context: string) {
   window.dispatchEvent(new CustomEvent('utoo:mascot-react', { detail: { context } }))
 }
 
-watch(filterCategory, loadPosts)
 watch(selectedSchoolSlug, async () => {
-  filterCategory.value = null
   searchText.value = ''
   appliedSearch.value = ''
   boardRequest.value = { name: '', description: '', parent_id: null }

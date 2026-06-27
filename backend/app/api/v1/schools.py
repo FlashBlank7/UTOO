@@ -20,6 +20,7 @@ def _school_brief(school: School | None) -> SchoolBrief | None:
         name_ja=school.name_ja,
         kind=school.kind,
         theme=school.theme,
+        description=school.description,
     )
 
 

@@ -14,6 +14,7 @@ class SchoolOut(BaseModel):
     rank_label: str | None = None
     rank_order: int | None = None
     theme: str
+    description: str | None = None
     is_active: bool
 
     model_config = {"from_attributes": True}
@@ -27,6 +28,7 @@ class SchoolBrief(BaseModel):
     name_ja: str
     kind: str = "real"
     theme: str = "standard"
+    description: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -63,6 +65,10 @@ class BoardPatchRequest(BaseModel):
     description: str | None = None
     status: str | None = None
     sort_order: int | None = None
+
+
+class SchoolPatchRequest(BaseModel):
+    description: str | None = None
 
 
 class SchoolMatchOut(BaseModel):

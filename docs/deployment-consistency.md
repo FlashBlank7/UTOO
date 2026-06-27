@@ -57,7 +57,7 @@ The parity script must pass all of these checks:
 - Run the latest SQLite migration from a simulated half-applied state, because
   Azure can retain DDL from a failed startup migration while `alembic_version`
   still points at the previous revision.
-- Verify `alembic_version = 0008`.
+- Verify the Alembic version expected by `scripts/azure_parity_check.py`.
 - Verify `枝江大学` exists as `virtual_public`.
 - Verify seeded school and board counts.
 - Boot FastAPI with the Azure-style gunicorn/uvicorn worker.

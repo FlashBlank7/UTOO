@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: utoo-azure-deploy
+  group: utoo-azure-deploy-v2
   cancel-in-progress: true
 
 env:

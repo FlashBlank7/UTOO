@@ -72,7 +72,9 @@ Zhijiang University starts with:
 公告, 综合讨论, 提问求助, 生活, 租房, 就职, 闲聊
 ```
 
-First-level boards are structural. Once created and approved, they should not be removable from the admin UI. Admins may edit their descriptions and ordering, but not hide/delete core first-level boards casually.
+First-level boards are structural, but they are still manageable. Admins and school moderators may add, edit, reorder, and archive first-level boards and subboards. Archiving is a soft-hide operation: the board disappears from normal navigation, while existing posts and audit context remain in the database.
+
+Seeded core boards should be archived carefully because they define the default forum shape. The UI should make archive actions explicit, but it should not block admins or moderators from cleaning accidental boards such as test boards or boards created under the wrong school.
 
 Subboards are optional. They exist to split a busy first-level board, such as:
 

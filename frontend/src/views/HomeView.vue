@@ -201,6 +201,38 @@
       </details>
     </section>
 
+    <section v-if="selectedSchool && canManageSelectedSchool" class="panel mb-5 bg-white p-4">
+      <details>
+        <summary class="cursor-pointer text-sm font-semibold text-slate-950">{{ t('boardManagement') }}</summary>
+        <div class="mt-3 divide-y divide-slate-200 border border-slate-200">
+          <div v-for="board in flatBoards" :key="board.id" class="grid gap-3 px-3 py-3 md:grid-cols-[1fr_auto] md:items-center">
+            <div>
+              <p class="font-medium text-slate-950">
+                <span v-if="board.parent_id" class="tag-accent mr-2">{{ t('subboard') }}</span>
+                {{ boardPathLabel(board) }}
+              </p>
+              <p class="mt-1 text-sm leading-6 text-slate-600">{{ board.description || t('boardIntroFallback') }}</p>
+              <span class="tag mt-2">{{ boardStatusLabel(board.status) }}</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" @click="openBoardDescriptionById(board)" class="btn-secondary">{{ t('editDescription') }}</button>
+              <button
+                v-if="board.status !== 'hidden'"
+                type="button"
+                :disabled="archivingBoardId === board.id"
+                @click="archiveBoard(board)"
+                class="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {{ archivingBoardId === board.id ? t('saving') : t('archiveBoard') }}
+              </button>
+            </div>
+          </div>
+          <div v-if="flatBoards.length === 0" class="py-8 text-center text-sm text-slate-500">{{ t('noBoardRequests') }}</div>
+        </div>
+        <p v-if="boardManageError" class="mt-3 text-sm text-red-600">{{ boardManageError }}</p>
+      </details>
+    </section>
+
     <section v-if="announcements.length > 0" class="panel mb-5 overflow-hidden border-teal-700/40">
       <div class="border-b border-slate-200 bg-teal-50 px-4 py-2 text-sm font-semibold text-teal-900">{{ t('pinnedAnnouncements') }}</div>
       <article
@@ -414,6 +446,8 @@ const savingDescription = ref(false)
 const descriptionSaveError = ref('')
 const descriptionEditor = ref<null | { type: 'school' | 'board'; id: number; title: string; value: string }>(null)
 const applyingModerator = ref(false)
+const archivingBoardId = ref<number | null>(null)
+const boardManageError = ref('')
 const newPostContentInput = ref<HTMLTextAreaElement | null>(null)
 const newPostContentCursor = ref({ start: 0, end: 0 })
 const categories = ['课程', '研究室', '生活', '租房', '就职', '闲聊']
@@ -531,6 +565,14 @@ function boardPathLabel(board: Board) {
   return parent ? `${parent.name} / ${board.name}` : board.name
 }
 
+function boardStatusLabel(status: string) {
+  if (status === 'pending') return t('pending')
+  if (status === 'approved') return t('approved')
+  if (status === 'rejected') return t('rejected')
+  if (status === 'hidden') return t('visibilityHidden')
+  return status
+}
+
 function openDescriptionEditor(type: 'school' | 'board') {
   descriptionSaveError.value = ''
   if (type === 'school' && selectedSchool.value) {
@@ -548,6 +590,16 @@ function openDescriptionEditor(type: 'school' | 'board') {
       title: boardPathLabel(activeBoard.value),
       value: activeBoard.value.description || ''
     }
+  }
+}
+
+function openBoardDescriptionById(board: Board) {
+  descriptionSaveError.value = ''
+  descriptionEditor.value = {
+    type: 'board',
+    id: board.id,
+    title: boardPathLabel(board),
+    value: board.description || ''
   }
 }
 
@@ -733,6 +785,25 @@ async function requestBoard() {
     boardRequestError.value = e.response?.data?.detail || t('boardRequestFailed')
   } finally {
     requestingBoard.value = false
+  }
+}
+
+async function archiveBoard(board: Board) {
+  archivingBoardId.value = board.id
+  boardManageError.value = ''
+  try {
+    const prefix = auth.isAdmin ? '/admin' : '/management'
+    await api.patch(`${prefix}/boards/${board.id}`, { status: 'hidden' })
+    if (activeBoard.value?.id === board.id || activeParentBoard.value?.id === board.id) {
+      await router.push(selectedSchool.value ? `/schools/${selectedSchool.value.slug}` : '/')
+    }
+    await loadBoards()
+    await loadPosts()
+    await loadAnnouncements()
+  } catch (e: any) {
+    boardManageError.value = e.response?.data?.detail || t('boardRequestFailed')
+  } finally {
+    archivingBoardId.value = null
   }
 }
 

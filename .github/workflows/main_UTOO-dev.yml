@@ -114,6 +114,12 @@ jobs:
               DATABASE_URL="${{ env.DATABASE_URL }}" \
               ACCESS_TOKEN_EXPIRE_MINUTES="${{ env.ACCESS_TOKEN_EXPIRE_MINUTES }}" \
               REFRESH_TOKEN_EXPIRE_DAYS="${{ env.REFRESH_TOKEN_EXPIRE_DAYS }}"
+          az webapp log config \
+            --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
+            --name "${{ env.AZURE_WEBAPP_NAME }}" \
+            --application-logging filesystem \
+            --level information \
+            --web-server-logging filesystem
 
       - name: Ensure Azure Web App is running before deploy
         run: |
@@ -143,15 +149,47 @@ jobs:
 
       - name: Check production health
         run: |
+          healthy=false
           for attempt in $(seq 1 40); do
             status="$(curl -sS -o /tmp/utoo-health -w "%{http_code}" --max-time 10 "${{ env.ALLOWED_ORIGINS }}/health" || true)"
             if [ "$status" = "200" ]; then
               cat /tmp/utoo-health
-              exit 0
+              healthy=true
+              break
             fi
             echo "Health check attempt ${attempt} returned ${status}; waiting..."
             sleep 15
           done
-          echo "Health check did not return 200 after deployment."
-          cat /tmp/utoo-health || true
-          exit 1
+          if [ "$healthy" != "true" ]; then
+            echo "Health check did not return 200 after deployment."
+            cat /tmp/utoo-health || true
+            exit 1
+          fi
+
+          lilies_ready=false
+          for attempt in $(seq 1 18); do
+            page_status="$(curl -sS -L -o /tmp/lilies-page -w "%{http_code}" --max-time 15 "${{ env.ALLOWED_ORIGINS }}/lilies" || true)"
+            api_status="$(curl -sS -o /tmp/lilies-health -w "%{http_code}" --max-time 15 "${{ env.ALLOWED_ORIGINS }}/api/platform/health" || true)"
+            if [ "$page_status" = "200" ] && \
+               [ "$api_status" = "200" ] && \
+               grep -q '/lilies/_next/' /tmp/lilies-page && \
+               grep -q '"status":"ok"' /tmp/lilies-health; then
+              echo "Lilies module is healthy through the public UTOO routes."
+              lilies_ready=true
+              break
+            fi
+            echo "Lilies check ${attempt}: page=${page_status} api=${api_status}; waiting..."
+            sleep 10
+          done
+          if [ "$lilies_ready" != "true" ]; then
+            echo "Lilies module did not become healthy after deployment."
+            cat /tmp/lilies-health || true
+            az webapp log download \
+              --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ env.AZURE_WEBAPP_NAME }}" \
+              --log-file /tmp/utoo-azure-logs.zip || true
+            if [ -f /tmp/utoo-azure-logs.zip ]; then
+              unzip -p /tmp/utoo-azure-logs.zip | tail -n 500 || true
+            fi
+            exit 1
+          fi

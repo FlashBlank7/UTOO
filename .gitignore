@@ -2,9 +2,11 @@ __pycache__/
 *.py[cod]
 .venv/
 backend/app/static/
+backend/lilies/
 utoo.db
 
 node_modules/
+.next/
 dist/
 
 .env

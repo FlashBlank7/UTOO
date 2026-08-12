@@ -4,6 +4,7 @@
       <div class="mx-auto flex max-w-5xl items-center justify-between">
         <router-link to="/" class="text-lg font-semibold tracking-[0.08em] text-slate-950">UTOO</router-link>
         <div class="flex items-center gap-4 text-sm">
+          <a href="/lilies" class="text-slate-600 hover:text-slate-950">Lilies</a>
           <template v-if="auth.isLoggedIn">
             <router-link to="/account" class="text-slate-600 hover:text-slate-950">{{ auth.displayName }}</router-link>
             <router-link to="/manage" class="link">{{ t('navManage') }}</router-link>

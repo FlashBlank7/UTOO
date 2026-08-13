@@ -62,7 +62,7 @@ export const useAuthStore = defineStore('auth', () => {
           return true
         })
         .catch(() => {
-          logout()
+          void logout()
           return false
         })
         .finally(() => {
@@ -95,7 +95,7 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = data
         return true
       } catch {
-        logout()
+        void logout()
         return false
       }
     }
@@ -106,11 +106,37 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('refresh_token', refresh)
   }
 
-  function logout() {
+  async function openLilies(target = '/lilies') {
+    const isLiliesDestination = target === '/lilies'
+      || target.startsWith('/lilies/')
+      || target.startsWith('/lilies?')
+      || target.startsWith('/lilies#')
+    const destination = isLiliesDestination ? target : '/lilies'
+    const hasSession = await ensureFreshAccess()
+    const token = localStorage.getItem('access_token')
+    if (!hasSession || !token) return false
+
+    try {
+      await axios.post('/api/v1/auth/lilies-session', undefined, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      window.location.assign(destination)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async function logout() {
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
     user.value = null
+    try {
+      await axios.delete('/api/v1/auth/lilies-session')
+    } catch {
+      // The local session is already gone; cookie expiry remains the fallback.
+    }
   }
 
-  return { user, isLoggedIn, isAdmin, displayName, ensureFreshAccess, fetchMe, setTokens, logout }
+  return { user, isLoggedIn, isAdmin, displayName, ensureFreshAccess, fetchMe, setTokens, openLilies, logout }
 })

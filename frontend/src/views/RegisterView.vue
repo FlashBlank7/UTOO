@@ -77,6 +77,19 @@ function nextPath() {
   return next.startsWith('/') && !next.startsWith('//') ? next : '/'
 }
 
+function isLiliesPath(path: string) {
+  return path === '/lilies' || path.startsWith('/lilies/') || path.startsWith('/lilies?')
+}
+
+async function continueAfterRegistration() {
+  const next = nextPath()
+  if (isLiliesPath(next)) {
+    if (!await auth.openLilies(next)) throw new Error('Unable to start Lilies session')
+    return
+  }
+  await router.replace(next)
+}
+
 async function submit() {
   error.value = ''
   loading.value = true
@@ -94,7 +107,7 @@ async function submit() {
     const { data } = await api.post('/auth/register', payload)
     auth.setTokens(data.access_token, data.refresh_token)
     await auth.fetchMe()
-    router.replace(nextPath())
+    await continueAfterRegistration()
   } catch (e: any) {
     error.value = registerErrorMessage(e)
   } finally {

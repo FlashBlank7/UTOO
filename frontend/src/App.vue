@@ -4,12 +4,12 @@
       <div class="mx-auto flex max-w-5xl items-center justify-between">
         <router-link to="/" class="text-lg font-semibold tracking-[0.08em] text-slate-950">UTOO</router-link>
         <div class="flex items-center gap-4 text-sm">
-          <a href="/lilies" class="text-slate-600 hover:text-slate-950">Lilies</a>
           <template v-if="auth.isLoggedIn">
+            <a href="/lilies" class="text-slate-600 hover:text-slate-950" @click.prevent="openLilies">Lilies</a>
             <router-link to="/account" class="text-slate-600 hover:text-slate-950">{{ auth.displayName }}</router-link>
             <router-link to="/manage" class="link">{{ t('navManage') }}</router-link>
             <router-link v-if="auth.isAdmin" to="/admin" class="link">{{ t('navAdminFull') }}</router-link>
-            <button @click="auth.logout(); $router.push('/')" class="text-slate-500 hover:text-slate-950">{{ t('logout') }}</button>
+            <button @click="logout" class="text-slate-500 hover:text-slate-950">{{ t('logout') }}</button>
           </template>
           <template v-else>
             <router-link to="/login" class="link">{{ t('login') }}</router-link>
@@ -32,14 +32,27 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import CatgirlWanderer from '@/components/CatgirlWanderer.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useI18n, type Locale } from '@/i18n'
 const auth = useAuthStore()
+const router = useRouter()
 const { currentLocale, localeOptions, setLocale, t } = useI18n()
 
 function handleLocaleChange(event: Event) {
   const next = (event.target as HTMLSelectElement).value
   if (next === 'zh' || next === 'en' || next === 'ja') setLocale(next as Locale)
+}
+
+async function openLilies() {
+  if (!await auth.openLilies()) {
+    await router.push({ path: '/login', query: { next: '/lilies' } })
+  }
+}
+
+async function logout() {
+  await auth.logout()
+  await router.push('/')
 }
 </script>

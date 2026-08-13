@@ -1,13 +1,16 @@
 import os
 from pathlib import Path
+from urllib.parse import urlencode
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.background import BackgroundTask
 from app.api.v1 import auth, posts, comments, admin, agent, reports, schools, boards, moderator_applications, management
 from app.core.config import settings
+from app.dependencies import get_optional_lilies_user
+from app.models.user import User
 
 app = FastAPI(title="UTOO", version="0.1.0")
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -49,6 +52,24 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/health/lilies", include_in_schema=False)
+async def lilies_health():
+    """Public readiness probe without exposing the authenticated Lilies API."""
+
+    target = f"{LILIES_FRONTEND_URL}/lilies/api/platform/health"
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            response = await client.get(target)
+            response.raise_for_status()
+            payload = response.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(status_code=503, detail="Lilies module is unavailable") from exc
+
+    if payload.get("status") != "ok":
+        raise HTTPException(status_code=503, detail="Lilies module is not ready")
+    return {"status": "ok"}
+
+
 @app.api_route(
     "/lilies",
     methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -69,10 +90,32 @@ async def health():
     methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     include_in_schema=False,
 )
-async def serve_lilies(request: Request, full_path: str = ""):
+async def serve_lilies(
+    request: Request,
+    full_path: str = "",
+    current_user: User | None = Depends(get_optional_lilies_user),
+):
     """Expose the Lilies standalone server through UTOO's single public port."""
 
     public_path = request.url.path
+    if not current_user:
+        if public_path.startswith("/api/platform") or request.method not in {"GET", "HEAD"}:
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication required for Lilies",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        next_path = public_path
+        if request.url.query:
+            next_path = f"{next_path}?{request.url.query}"
+        login_url = f"/login?{urlencode({'next': next_path})}"
+        return RedirectResponse(
+            login_url,
+            status_code=303,
+            headers={"Cache-Control": "no-store"},
+        )
+
     upstream_path = f"/lilies{public_path}" if public_path.startswith("/api/platform") else public_path
     target = f"{LILIES_FRONTEND_URL}{upstream_path}"
     if request.url.query:
@@ -81,7 +124,8 @@ async def serve_lilies(request: Request, full_path: str = ""):
     request_headers = [
         (name, value)
         for name, value in request.headers.raw
-        if name.lower() not in PROXY_HOP_BY_HOP_HEADERS and name.lower() != b"host"
+        if name.lower() not in PROXY_HOP_BY_HOP_HEADERS
+        and name.lower() not in {b"host", b"cookie", b"authorization"}
     ]
     client = httpx.AsyncClient(timeout=None, follow_redirects=False)
     try:

@@ -1,6 +1,7 @@
+import os
 import secrets
 import string
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from jose import JWTError
@@ -8,15 +9,53 @@ from app.db.session import get_db
 from app.models.user import User
 from app.models.school import School
 from app.models.activation_code import ActivationCode, ActivationCodeUsage
-from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, decode_token
+from app.core.config import settings
+from app.core.security import (
+    create_access_token,
+    create_lilies_session_token,
+    create_refresh_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
 from app.core.schools import resolve_school_input
 from app.schemas.user import RegisterRequest, LoginRequest, RefreshRequest, TokenResponse, UserOut, UpdateMeRequest
 from app.schemas.school import SchoolBrief
-from app.dependencies import get_current_user
+from app.dependencies import LILIES_SESSION_COOKIE, get_current_user
 
 router = APIRouter()
 
 ADMIN_BOOTSTRAP_CODE = "UTOO-ADMIN"
+
+
+def _is_https(request: Request) -> bool:
+    forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
+    return (
+        request.url.scheme == "https"
+        or forwarded_proto.lower() == "https"
+        or bool(os.getenv("WEBSITE_SITE_NAME"))
+    )
+
+
+def _set_lilies_session(response: Response, request: Request, session_token: str) -> None:
+    response.set_cookie(
+        key=LILIES_SESSION_COOKIE,
+        value=session_token,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+        secure=_is_https(request),
+        httponly=True,
+        samesite="lax",
+    )
+
+
+def _token_response(response: Response, request: Request, user_id: int) -> TokenResponse:
+    access_token = create_access_token(user_id)
+    _set_lilies_session(response, request, create_lilies_session_token(user_id))
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=create_refresh_token(user_id),
+    )
 
 
 def _school_brief(school: School | None) -> SchoolBrief | None:
@@ -54,7 +93,12 @@ async def _user_out(db: AsyncSession, user: User) -> UserOut:
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(
+    body: RegisterRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     username = body.username.strip()
     display_name = body.display_name.strip() if body.display_name else None
     department = body.department.strip() if body.department else None
@@ -88,10 +132,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
             existing_admin.email = str(body.email) if body.email else None
             await db.commit()
             await db.refresh(existing_admin)
-            return TokenResponse(
-                access_token=create_access_token(existing_admin.id),
-                refresh_token=create_refresh_token(existing_admin.id),
-            )
+            return _token_response(response, request, existing_admin.id)
         is_admin = True
         activation_code_record = None
     else:
@@ -135,11 +176,16 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
         db.add(ActivationCodeUsage(code_id=activation_code_record.id, user_id=user.id))
 
     await db.commit()
-    return TokenResponse(access_token=create_access_token(user.id), refresh_token=create_refresh_token(user.id))
+    return _token_response(response, request, user.id)
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(
+    body: LoginRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     if not body.username and not body.email:
         raise HTTPException(status_code=400, detail="Provide username or email")
 
@@ -154,11 +200,16 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     if user.is_banned:
         raise HTTPException(status_code=403, detail="Account is banned")
 
-    return TokenResponse(access_token=create_access_token(user.id), refresh_token=create_refresh_token(user.id))
+    return _token_response(response, request, user.id)
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+async def refresh(
+    body: RefreshRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     try:
         payload = decode_token(body.refresh_token)
         if payload.get("type") != "refresh":
@@ -174,7 +225,27 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     if user.is_banned:
         raise HTTPException(status_code=403, detail="Account is banned")
 
-    return TokenResponse(access_token=create_access_token(user.id), refresh_token=create_refresh_token(user.id))
+    return _token_response(response, request, user.id)
+
+
+@router.post("/lilies-session", status_code=status.HTTP_204_NO_CONTENT)
+async def create_lilies_session(
+    request: Request,
+    response: Response,
+    current_user: User = Depends(get_current_user),
+):
+    _set_lilies_session(response, request, create_lilies_session_token(current_user.id))
+
+
+@router.delete("/lilies-session", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_lilies_session(request: Request, response: Response):
+    response.delete_cookie(
+        key=LILIES_SESSION_COOKIE,
+        path="/",
+        secure=_is_https(request),
+        httponly=True,
+        samesite="lax",
+    )
 
 
 @router.get("/me", response_model=UserOut)

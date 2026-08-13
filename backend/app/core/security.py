@@ -19,6 +19,15 @@ def create_access_token(subject: int) -> str:
     return jwt.encode({"sub": str(subject), "exp": expire, "type": "access"}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
+def create_lilies_session_token(subject: int) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    return jwt.encode(
+        {"sub": str(subject), "exp": expire, "type": "lilies_session"},
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+    )
+
+
 def create_refresh_token(subject: int) -> str:
     expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     return jwt.encode({"sub": str(subject), "exp": expire, "type": "refresh"}, settings.SECRET_KEY, algorithm=settings.ALGORITHM)

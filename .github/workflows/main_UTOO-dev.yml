@@ -168,22 +168,26 @@ jobs:
 
           lilies_ready=false
           for attempt in $(seq 1 18); do
-            page_status="$(curl -sS -L -o /tmp/lilies-page -w "%{http_code}" --max-time 15 "${{ env.ALLOWED_ORIGINS }}/lilies" || true)"
+            page_status="$(curl -sS -D /tmp/lilies-headers -o /tmp/lilies-page -w "%{http_code}" --max-time 15 "${{ env.ALLOWED_ORIGINS }}/lilies" || true)"
             api_status="$(curl -sS -o /tmp/lilies-health -w "%{http_code}" --max-time 15 "${{ env.ALLOWED_ORIGINS }}/api/platform/health" || true)"
-            if [ "$page_status" = "200" ] && \
-               [ "$api_status" = "200" ] && \
-               grep -q '/lilies/_next/' /tmp/lilies-page && \
-               grep -q '"status":"ok"' /tmp/lilies-health; then
-              echo "Lilies module is healthy through the public UTOO routes."
+            readiness_status="$(curl -sS -o /tmp/lilies-readiness -w "%{http_code}" --max-time 15 "${{ env.ALLOWED_ORIGINS }}/health/lilies" || true)"
+            if [ "$page_status" = "303" ] && \
+               [ "$api_status" = "401" ] && \
+               [ "$readiness_status" = "200" ] && \
+               grep -qiF 'location: /login?next=%2Flilies' /tmp/lilies-headers && \
+               grep -q '"status":"ok"' /tmp/lilies-readiness; then
+              echo "Lilies module is healthy and rejects unauthenticated public requests."
               lilies_ready=true
               break
             fi
-            echo "Lilies check ${attempt}: page=${page_status} api=${api_status}; waiting..."
+            echo "Lilies check ${attempt}: page=${page_status} api=${api_status} readiness=${readiness_status}; waiting..."
             sleep 10
           done
           if [ "$lilies_ready" != "true" ]; then
             echo "Lilies module did not become healthy after deployment."
+            cat /tmp/lilies-headers || true
             cat /tmp/lilies-health || true
+            cat /tmp/lilies-readiness || true
             az webapp log download \
               --resource-group "${{ env.AZURE_RESOURCE_GROUP }}" \
               --name "${{ env.AZURE_WEBAPP_NAME }}" \

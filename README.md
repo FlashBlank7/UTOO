@@ -1,238 +1,76 @@
-# UTOO
+# UTOO · 留学生交流社区
 
-UTOO 是一个面向在日留学生的学校板块论坛，支持匿名/实名发帖、评论、举报、管理员治理、Agent 发帖/评论和 Yutoko 表情包。项目包含：
+UTOO is a personal student forum with school boards, posts, comments, moderation tools and an AI-assisted mascot, Yutoko. To try it locally, follow the two-terminal setup below, then register the first administrator at `/register` with the bootstrap code `UTOO-ADMIN` in your own fresh database.
 
-- 后端：FastAPI + SQLAlchemy + Alembic
-- 前端：Vue 3 + Vite + Pinia
-- 数据库：PostgreSQL
+UTOO 把校园交流按「学校 → 板块 → 子板块」组织。用户可以匿名或实名发帖、回复、使用表情包和举报内容；管理员可以处理举报、审批板块申请和生成邀请码。注册时可以不填学校，默认公共区「枝江大学」是虚拟社区。经费有限，后续开发与推广暂缓；体验公开源码可以直接在本机运行。
 
-## 当前产品结构
+## 本地启动 · Local quick start
 
-- 平台定位：`留学生平台 / International Student Platform / 留学生プラットフォーム`
-- 学校结构：`学校/公共区 -> 板块 -> 子板块`，固定两级，不做无限层级。
-- 公共区：`枝江大学` 是虚拟学校，slug 为 `zhijiang-university`，用于公共讨论和未填写学校用户的默认展示。
-- 默认学校：用户注册或更新资料时不填学校，会默认绑定并显示为 `枝江大学`。
-- 学校匹配：后端会用中文、英文、日文、简称等别名匹配真实学校；匹配不到时只保存为用户自定义学校名，不自动创建公开学校板块。
-- 学校维护：用户不需要申请学校，直接进入对应学校板块；缺失学校由管理员在后台创建，或通过迁移 seed。
-- 学校种子：迁移会 seed THE World University Rankings 2026 日本前 50 学校，并额外 seed NAIST，为每个真实学校创建默认板块。
-- 默认板块：真实学校包含 `公告`、`课程`、`研究室`、`生活`、`租房`、`就职`、`闲聊`；枝江大学包含 `公告`、`综合讨论`、`生活`、`租房`、`就职`、`闲聊`、`提问求助`。
-- 板块申请：用户可申请板块或子板块，管理员在后台审核后公开。
-- 产品设计文档：`docs/product-design.md`
-- 技术架构文档：`docs/technical-architecture.md`
+准备 Git、Python 3.12 和 Node.js 22（含 npm）。后端是 FastAPI，前端是 Vue 3。首次体验直接用 SQLite，空库迁移会创建表、学校和板块。以下命令使用全新目录和默认配置。
 
-项目默认端口已避开常见的 `3000`、`8000`、`8001`：
-
-- 前端：http://localhost:5174
-- 后端：http://localhost:8010
-- API 文档：http://localhost:8010/docs
-
-## 使用 Docker 启动
-
-确保已经安装 Docker Desktop，然后在项目根目录运行：
-
-```bash
-docker compose up -d --build
+```sh
+git clone https://github.com/FlashBlank7/UTOO.git
+cd UTOO
 ```
 
-首次启动时，后端容器会自动执行数据库迁移。
+**终端 1 · API。** 从仓库根目录进入 `backend`，按系统选择一组命令。保持终端运行。默认数据库写入 `backend/utoo.db`；已有 `DATABASE_URL` 会覆盖此默认值。
 
-查看服务状态：
+Windows PowerShell：
 
-```bash
-docker compose ps
+```powershell
+cd backend
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8010
 ```
 
-查看日志：
-
-```bash
-docker compose logs -f backend
-docker compose logs -f frontend
-```
-
-停止服务：
-
-```bash
-docker compose down
-```
-
-如需连同数据库数据一起清理：
-
-```bash
-docker compose down -v
-```
-
-## 首次登录
-
-先打开前端：
-
-```text
-http://localhost:5174
-```
-
-注册第一个管理员账号时，激活码填写：
-
-```text
-UTOO-ADMIN
-```
-
-管理员账号创建后，可以进入 `/admin` 生成普通用户使用的激活码。
-
-## 本地开发启动
-
-也可以只用 Docker 启动数据库，前后端在本机开发运行。
-
-### 1. 启动数据库
-
-```bash
-docker compose up -d db
-```
-
-### 2. 启动后端
+Linux / macOS：
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-DATABASE_URL=postgresql+asyncpg://utoo:utoo_secret@localhost:5432/utoo_db alembic upgrade head
-DATABASE_URL=postgresql+asyncpg://utoo:utoo_secret@localhost:5432/utoo_db uvicorn app.main:app --host 0.0.0.0 --port 8010 --reload
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m alembic upgrade head
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8010
 ```
 
-后端健康检查：
+打开 [API 健康检查](http://127.0.0.1:8010/health)，应看到 `{"status":"ok"}`。接口可在 [API 文档](http://127.0.0.1:8010/docs) 查看。
 
-```bash
-curl http://localhost:8010/health
-```
+**终端 2 · Web。** 从同一个仓库的根目录执行：
 
-### 3. 启动前端
-
-另开一个终端：
-
-```bash
+```sh
 cd frontend
-npm install
-npm run dev
+npm ci
+npm run dev -- --host 127.0.0.1
 ```
 
-Vite 开发服务器会运行在：
+打开 [论坛](http://127.0.0.1:5174/)。前端会把 `/api` 请求转发到 8010。结束试用时在两个终端分别按 Ctrl+C；下次保留数据库，在相同目录重新启动 API 和 Web 即可。
 
-```text
-http://localhost:5174
+### 试一遍注册、发帖和表情
+
+1. 在[注册页](http://127.0.0.1:5174/register)输入新用户名、密码和激活码 `UTOO-ADMIN`。这一步用于初始化本机数据库的首个管理员。提示该码已使用时，登录原管理员账号，在 [管理后台](http://127.0.0.1:5174/admin) 生成普通邀请码。
+2. 进入「枝江大学」的「闲聊」板块，发一条测试帖子，在正文中加入 `:yutoko_thanks:`。打开帖子，检查正文和表情，再留一条评论。看板角色和表情来自项目内的[素材目录](frontend/public/stickers/yutoko/)。
+3. 若注册或发帖失败，先看 8010 的健康检查，再看终端 1 的迁移是否成功。未登录直接请求帖子列表会返回 401。若 5174 启动时报端口占用，先检查是否已经启动了另一个前端实例。
+
+## Docker 与部署
+
+需要试 PostgreSQL 或容器版时，在根目录用 Docker Engine/Desktop 和 Compose v2 启动。该方案占用宿主端口 5432、8010、5174；先停止同端口的本地服务。
+
+```sh
+docker compose up -d --build
+docker compose ps
+docker compose logs --tail 60 backend
 ```
 
-前端开发代理会把 `/api` 请求转发到：
+入口仍是 [5174](http://localhost:5174/)。这里的 PostgreSQL 数据保存在 Compose 卷中，和本地 SQLite 分开，首次注册也分别进行。用 `docker compose down` 停止并保留数据。Compose 文件中的开发配置适合本机试用；在对外开放之前需设置独立密钥并完成管理员初始化。
 
-```text
-http://localhost:8010
-```
+Azure 部署采用另一种结构：FastAPI 同时提供 Vue 静态文件，SQLite 写入持久目录。配置、静态资源打包、启动命令及发布前检查见[部署一致性文档](docs/deployment-consistency.md)和[部署问题记录](docs/azure-deployment-lessons.md)。
 
-## 端口配置
+## 项目导航
 
-当前端口配置位置：
-
-- Docker 前端端口：`docker-compose.yml` 中的 `frontend.ports`，当前为 `5174:80`
-- Docker 后端端口：`docker-compose.yml` 中的 `backend.ports`，当前为 `8010:8010`
-- 后端启动端口：`backend/start.sh`，默认读取 `BACKEND_PORT`，缺省为 `8010`
-- Vite 开发端口和代理：`frontend/vite.config.ts`
-- Nginx 生产代理：`frontend/nginx.conf`
-- 后端 CORS：`backend/app/main.py`
-
-如果本机 `5432` 已被其他 PostgreSQL 占用，可以把 `docker-compose.yml` 里的数据库端口左侧改成其他端口，例如 `15432:5432`，并在本地开发后端时同步调整 `DATABASE_URL`。
-
-## Yutoko / 優都子 形象与表情包素材
-
-`Yutoko / 優都子 / ゆとこ` 是 UTOO 的原创看板娘。当前形象迭代和表情包素材保存在仓库里，方便之后继续改造：
-
-- 七日换装透明 PNG：`frontend/src/assets/mascot/yutoko/exports/`
-- 当前形象提示词与设计 notes：`frontend/src/assets/mascot/yutoko/prompts/yutoko-v2.md`
-- 论坛内公开表情包：`frontend/public/stickers/yutoko/`
-- 表情包 v1 提示词与制作 notes：`frontend/src/assets/mascot/yutoko/prompts/yutoko-stickers-v1.md`
-
-表情包在帖子和评论正文里使用短代码保存，例如 `:yutoko_thanks:`、`:yutoko_cheer:`、`:yutoko_yubikubi:`。前端只渲染白名单 manifest 中定义的 Yutoko 短代码，不支持任意图片 URL 或 HTML。
-
-## Azure App Service 免费版部署
-
-本项目支持部署到单个 Azure App Service Python 应用：
-
-- FastAPI 提供 `/api/v1/*` 接口
-- FastAPI 同时托管 Vue 构建后的静态文件
-- 免费版默认使用 SQLite，数据库文件保存在 Azure App Service 的 `/home/data/utoo.db`
-- 用户只需要访问一个域名：`https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net`
-
-GitHub Actions 工作流位于：
-
-```text
-.github/workflows/main_UTOO-dev.yml
-```
-
-部署事故复盘和发布注意事项见：
-
-```text
-docs/azure-deployment-lessons.md
-```
-
-部署一致性契约和必跑检查见：
-
-```text
-docs/deployment-consistency.md
-python scripts/azure_parity_check.py --require-static
-```
-
-工作流会在推送到 `main` 时：
-
-1. 构建 `frontend`
-2. 把 `frontend/dist` 复制到 `backend/app/static`
-3. 校验后端依赖、Python 编译和 Azure SQLite/gunicorn runtime parity
-4. 将 Python 依赖打包进 `backend/.python_packages`
-5. 配置 Azure App Service 启动命令和 SQLite `DATABASE_URL`
-6. 将 `backend-deploy.zip` 部署到 Azure App Service
-
-注意：Azure App Service ZIP Deploy 不是热部署。部署阶段可能耗时数分钟，并可能短暂重启 Python 进程。开发和素材迭代应先走本地或 `dev` 分支验证，`main` 只用于确认后的生产发布。
-
-GitHub 仓库需要配置 Azure Deployment Center 自动生成的 OIDC secrets：
-
-```text
-AZUREAPPSERVICE_CLIENTID_...
-AZUREAPPSERVICE_TENANTID_...
-AZUREAPPSERVICE_SUBSCRIPTIONID_...
-```
-
-Azure App Service 需要设置 Startup Command：
-
-```bash
-bash startup.sh
-```
-
-工作流会自动设置以下应用配置：
-
-```text
-DATABASE_URL=sqlite+aiosqlite:////home/data/utoo.db
-SCM_DO_BUILD_DURING_DEPLOYMENT=false
-ENABLE_ORYX_BUILD=false
-ALLOWED_ORIGINS=https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net
-ACCESS_TOKEN_EXPIRE_MINUTES=120
-REFRESH_TOKEN_EXPIRE_DAYS=30
-```
-
-当前工作流由 GitHub Actions 预装依赖并打包部署，因此不要在 Azure Portal 里手动把 Oryx 构建开关改回开启，除非同步改回 workflow 和启动脚本。
-
-建议在 Azure App Service 的环境变量中手动设置一个生产用密钥：
-
-```text
-SECRET_KEY=<生产随机长字符串>
-```
-
-如果以后迁移到 PostgreSQL，只需要把 Azure App Service 中的 `DATABASE_URL` 改回 PostgreSQL asyncpg 连接串，例如：
-
-```text
-DATABASE_URL=postgresql+asyncpg://<user>:<password>@<host>:5432/<database>?ssl=require
-```
-
-部署后验证：
-
-```bash
-curl https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net/health
-curl -i https://utoo-dev-f9d3b4fteaaqb8e9.japaneast-01.azurewebsites.net/api/v1/posts
-```
-
-如果线上出现 `403 This web app is stopped`，先在 Azure Portal 启动 App Service；如果出现 `503 Application Error`，先看 App Service 应用日志，不要连续盲目推送新提交。
+| 想了解什么 | 从哪里看 |
+|---|---|
+| 学校、公共区、学校别名和板块治理 | [产品设计](docs/product-design.md) |
+| API、数据模型、前端与鉴权 | [技术架构](docs/technical-architecture.md) · [后端](backend/app) · [前端](frontend/src) |
+| Yutoko 的形象与表情如何制作 | [形象设定](frontend/src/assets/mascot/yutoko/prompts/yutoko-v2.md) · [表情包制作笔记](frontend/src/assets/mascot/yutoko/prompts/yutoko-stickers-v1.md) |
